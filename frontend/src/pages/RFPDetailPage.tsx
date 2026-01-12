@@ -1,0 +1,361 @@
+/**
+ * Página de detalle de RFP
+ */
+import React, { useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { 
+  Layout, Typography, Card, Descriptions, Tag, Button, Space, 
+  Spin, Modal, Input, message, Row, Col, Alert, Divider, List 
+} from 'antd';
+import { 
+  ArrowLeftOutlined, CheckOutlined, CloseOutlined, 
+  ExclamationCircleOutlined, CalendarOutlined, DollarOutlined,
+  GlobalOutlined, CodeOutlined
+} from '@ant-design/icons';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { rfpApi } from '../lib/api';
+import AppLayout from '../components/layout/AppLayout';
+import type { RFPStatus, Recommendation } from '../types';
+import dayjs from 'dayjs';
+
+const { Title, Text, Paragraph } = Typography;
+const { Content } = Layout;
+const { TextArea } = Input;
+
+const statusColors: Record<RFPStatus, string> = {
+  pending: 'default',
+  analyzing: 'processing',
+  analyzed: 'warning',
+  go: 'success',
+  no_go: 'error',
+  error: 'error',
+};
+
+const statusLabels: Record<RFPStatus, string> = {
+  pending: 'Pendiente',
+  analyzing: 'Analizando',
+  analyzed: 'Analizado',
+  go: 'GO',
+  no_go: 'NO GO',
+  error: 'Error',
+};
+
+const recommendationColors: Record<Recommendation, string> = {
+  strong_go: 'green',
+  go: 'lime',
+  conditional_go: 'gold',
+  no_go: 'orange',
+  strong_no_go: 'red',
+};
+
+const recommendationLabels: Record<Recommendation, string> = {
+  strong_go: 'Muy Recomendable',
+  go: 'Recomendable',
+  conditional_go: 'Condicional',
+  no_go: 'No Recomendable',
+  strong_no_go: 'Definitivamente No',
+};
+
+const RFPDetailPage: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  const [noGoReason, setNoGoReason] = useState('');
+  const [noGoModalOpen, setNoGoModalOpen] = useState(false);
+
+  const { data: rfp, isLoading } = useQuery({
+    queryKey: ['rfp', id],
+    queryFn: () => rfpApi.get(id!),
+    enabled: !!id,
+  });
+
+  const decisionMutation = useMutation({
+    mutationFn: ({ decision, reason }: { decision: 'go' | 'no_go'; reason?: string }) =>
+      rfpApi.makeDecision(id!, { decision, reason }),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['rfp', id], data);
+      message.success(`Decisión registrada: ${data.decision?.toUpperCase()}`);
+      if (data.decision === 'go') {
+        navigate(`/rfp/${id}/questions`);
+      }
+    },
+    onError: () => {
+      message.error('Error al registrar la decisión');
+    },
+  });
+
+  const handleGo = () => {
+    decisionMutation.mutate({ decision: 'go' });
+  };
+
+  const handleNoGo = () => {
+    setNoGoModalOpen(true);
+  };
+
+  const confirmNoGo = () => {
+    decisionMutation.mutate({ decision: 'no_go', reason: noGoReason });
+    setNoGoModalOpen(false);
+    setNoGoReason('');
+  };
+
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <Content style={{ padding: 24, textAlign: 'center' }}>
+          <Spin size="large" />
+        </Content>
+      </AppLayout>
+    );
+  }
+
+  if (!rfp) {
+    return (
+      <AppLayout>
+        <Content style={{ padding: 24 }}>
+          <Alert type="error" message="RFP no encontrado" />
+        </Content>
+      </AppLayout>
+    );
+  }
+
+  const extracted = rfp.extracted_data;
+
+  return (
+    <AppLayout>
+      <Content style={{ padding: 24 }}>
+        {/* Header */}
+        <div style={{ marginBottom: 24 }}>
+          <Button 
+            icon={<ArrowLeftOutlined />} 
+            onClick={() => navigate('/')}
+            style={{ marginBottom: 16 }}
+          >
+            Volver
+          </Button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div>
+              <Title level={2} style={{ margin: 0 }}>
+                {rfp.client_name || rfp.file_name}
+              </Title>
+              <Space style={{ marginTop: 8 }}>
+                <Tag color={statusColors[rfp.status]}>{statusLabels[rfp.status]}</Tag>
+                {rfp.recommendation && (
+                  <Tag color={recommendationColors[rfp.recommendation]}>
+                    IA: {recommendationLabels[rfp.recommendation]}
+                  </Tag>
+                )}
+              </Space>
+            </div>
+            
+            {/* Decision Buttons */}
+            {rfp.status === 'analyzed' && !rfp.decision && (
+              <Space size="large">
+                <Button
+                  type="primary"
+                  size="large"
+                  icon={<CheckOutlined />}
+                  onClick={handleGo}
+                  loading={decisionMutation.isPending}
+                  style={{ background: '#52c41a', borderColor: '#52c41a' }}
+                >
+                  GO
+                </Button>
+                <Button
+                  danger
+                  size="large"
+                  icon={<CloseOutlined />}
+                  onClick={handleNoGo}
+                  loading={decisionMutation.isPending}
+                >
+                  NO GO
+                </Button>
+              </Space>
+            )}
+
+            {rfp.decision === 'go' && (
+              <Button 
+                type="primary" 
+                onClick={() => navigate(`/rfp/${id}/questions`)}
+              >
+                Ver Preguntas
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <Row gutter={24}>
+          {/* Main Info */}
+          <Col span={16}>
+            <Card title="Información del RFP" style={{ marginBottom: 24 }}>
+              <Descriptions column={2}>
+                <Descriptions.Item label={<><GlobalOutlined /> País</>}>
+                  {rfp.country || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Categoría">
+                  {rfp.category?.replace(/_/g, ' ') || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label={<><DollarOutlined /> Presupuesto</>}>
+                  {rfp.budget_min || rfp.budget_max ? (
+                    `${rfp.currency} ${rfp.budget_min?.toLocaleString() || '?'} - ${rfp.budget_max?.toLocaleString() || '?'}`
+                  ) : '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label={<><CalendarOutlined /> Deadline Propuesta</>}>
+                  {rfp.proposal_deadline ? dayjs(rfp.proposal_deadline).format('DD/MM/YYYY') : '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Duración Proyecto">
+                  {rfp.project_duration || '-'}
+                </Descriptions.Item>
+                <Descriptions.Item label="Confianza IA">
+                  {rfp.confidence_score ? `${rfp.confidence_score}%` : '-'}
+                </Descriptions.Item>
+              </Descriptions>
+              
+              {rfp.summary && (
+                <>
+                  <Divider />
+                  <Title level={5}>Resumen</Title>
+                  <Paragraph>{rfp.summary}</Paragraph>
+                </>
+              )}
+            </Card>
+
+            {/* Tech Stack */}
+            {extracted?.tech_stack && extracted.tech_stack.length > 0 && (
+              <Card title={<><CodeOutlined /> Stack Tecnológico</>} style={{ marginBottom: 24 }}>
+                <Space wrap>
+                  {extracted.tech_stack.map((tech, i) => (
+                    <Tag key={i} color="blue">{tech}</Tag>
+                  ))}
+                </Space>
+              </Card>
+            )}
+
+            {/* Risks */}
+            {extracted?.risks && extracted.risks.length > 0 && (
+              <Card 
+                title={<><ExclamationCircleOutlined /> Riesgos Identificados</>}
+                style={{ marginBottom: 24 }}
+              >
+                <List
+                  dataSource={extracted.risks}
+                  renderItem={(risk) => (
+                    <List.Item>
+                      <List.Item.Meta
+                        avatar={
+                          <Tag color={
+                            risk.severity === 'critical' ? 'red' :
+                            risk.severity === 'high' ? 'orange' :
+                            risk.severity === 'medium' ? 'gold' : 'default'
+                          }>
+                            {risk.severity.toUpperCase()}
+                          </Tag>
+                        }
+                        title={risk.category.replace(/_/g, ' ').toUpperCase()}
+                        description={risk.description}
+                      />
+                    </List.Item>
+                  )}
+                />
+              </Card>
+            )}
+          </Col>
+
+          {/* Sidebar */}
+          <Col span={8}>
+            {/* Recommendation Reasons */}
+            {extracted?.recommendation_reasons && extracted.recommendation_reasons.length > 0 && (
+              <Card title="Razones de la Recomendación" style={{ marginBottom: 24 }}>
+                <List
+                  size="small"
+                  dataSource={extracted.recommendation_reasons}
+                  renderItem={(reason) => (
+                    <List.Item>
+                      <Text>{reason}</Text>
+                    </List.Item>
+                  )}
+                />
+              </Card>
+            )}
+
+            {/* SLAs */}
+            {extracted?.sla && extracted.sla.length > 0 && (
+              <Card title="SLAs" style={{ marginBottom: 24 }}>
+                <List
+                  size="small"
+                  dataSource={extracted.sla}
+                  renderItem={(sla) => (
+                    <List.Item>
+                      <Space direction="vertical" size={0}>
+                        <Text strong>{sla.description}</Text>
+                        {sla.metric && <Text type="secondary">{sla.metric}</Text>}
+                        {sla.is_aggressive && <Tag color="red">Agresivo</Tag>}
+                      </Space>
+                    </List.Item>
+                  )}
+                />
+              </Card>
+            )}
+
+            {/* Penalties */}
+            {extracted?.penalties && extracted.penalties.length > 0 && (
+              <Card title="Penalidades" style={{ marginBottom: 24 }}>
+                <List
+                  size="small"
+                  dataSource={extracted.penalties}
+                  renderItem={(penalty) => (
+                    <List.Item>
+                      <Space direction="vertical" size={0}>
+                        <Text strong>{penalty.description}</Text>
+                        {penalty.amount && <Text type="secondary">{penalty.amount}</Text>}
+                        {penalty.is_high && <Tag color="red">Alta</Tag>}
+                      </Space>
+                    </List.Item>
+                  )}
+                />
+              </Card>
+            )}
+
+            {/* Decision Info */}
+            {rfp.decision && (
+              <Card title="Decisión Registrada">
+                <Tag color={rfp.decision === 'go' ? 'success' : 'error'} style={{ fontSize: 16, padding: '4px 12px' }}>
+                  {rfp.decision.toUpperCase()}
+                </Tag>
+                {rfp.decision_reason && (
+                  <Paragraph style={{ marginTop: 12 }}>
+                    <Text strong>Razón:</Text> {rfp.decision_reason}
+                  </Paragraph>
+                )}
+                {rfp.decided_at && (
+                  <Text type="secondary">
+                    {dayjs(rfp.decided_at).format('DD/MM/YYYY HH:mm')}
+                  </Text>
+                )}
+              </Card>
+            )}
+          </Col>
+        </Row>
+
+        {/* NO GO Modal */}
+        <Modal
+          title="Confirmar NO GO"
+          open={noGoModalOpen}
+          onOk={confirmNoGo}
+          onCancel={() => setNoGoModalOpen(false)}
+          okText="Confirmar NO GO"
+          okButtonProps={{ danger: true }}
+        >
+          <p>¿Estás seguro de marcar este RFP como NO GO?</p>
+          <TextArea
+            placeholder="Razón del NO GO (opcional)"
+            value={noGoReason}
+            onChange={(e) => setNoGoReason(e.target.value)}
+            rows={4}
+          />
+        </Modal>
+      </Content>
+    </AppLayout>
+  );
+};
+
+export default RFPDetailPage;

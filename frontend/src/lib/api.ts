@@ -1,0 +1,154 @@
+/**
+ * Cliente API para RFP Analyzer
+ */
+import axios, { type AxiosInstance, type AxiosError, type InternalAxiosRequestConfig } from 'axios';
+import type {
+  AuthToken,
+  LoginCredentials,
+  RegisterData,
+  User,
+  DashboardStats,
+  RFPListResponse,
+  RFPDetail,
+  RFPQuestion,
+  RFPDecision,
+  UploadResponse,
+} from '../types';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
+
+// Crear instancia de axios
+const api: AxiosInstance = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Interceptor para añadir token
+api.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  const token = localStorage.getItem('access_token');
+  if (token && config.headers) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
+
+// Interceptor para manejar errores de auth
+api.interceptors.response.use(
+  (response) => response,
+  (error: AxiosError) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+    return Promise.reject(error);
+  }
+);
+
+// ============ AUTH ============
+
+export const authApi = {
+  login: async (credentials: LoginCredentials): Promise<AuthToken> => {
+    const { data } = await api.post<AuthToken>('/auth/login', credentials);
+    return data;
+  },
+
+  register: async (userData: RegisterData): Promise<AuthToken> => {
+    const { data } = await api.post<AuthToken>('/auth/register', userData);
+    return data;
+  },
+
+  getMe: async (): Promise<User> => {
+    const { data } = await api.get<User>('/auth/me');
+    return data;
+  },
+
+  refresh: async (): Promise<AuthToken> => {
+    const { data } = await api.post<AuthToken>('/auth/refresh');
+    return data;
+  },
+};
+
+// ============ DASHBOARD ============
+
+export const dashboardApi = {
+  getStats: async (): Promise<DashboardStats> => {
+    const { data } = await api.get<DashboardStats>('/dashboard/stats');
+    return data;
+  },
+
+  getRecent: async (limit: number = 10): Promise<RFPDetail[]> => {
+    const { data } = await api.get<RFPDetail[]>(`/dashboard/recent?limit=${limit}`);
+    return data;
+  },
+
+  getPending: async (): Promise<RFPDetail[]> => {
+    const { data } = await api.get<RFPDetail[]>('/dashboard/pending');
+    return data;
+  },
+
+  getByCategory: async (): Promise<Array<{ category: string; count: number }>> => {
+    const { data } = await api.get('/dashboard/by-category');
+    return data;
+  },
+
+  getByStatus: async (): Promise<Array<{ status: string; count: number }>> => {
+    const { data } = await api.get('/dashboard/by-status');
+    return data;
+  },
+};
+
+// ============ RFP ============
+
+export const rfpApi = {
+  list: async (params?: {
+    page?: number;
+    page_size?: number;
+    status?: string;
+    category?: string;
+    search?: string;
+  }): Promise<RFPListResponse> => {
+    const { data } = await api.get<RFPListResponse>('/rfp', { params });
+    return data;
+  },
+
+  get: async (id: string): Promise<RFPDetail> => {
+    const { data } = await api.get<RFPDetail>(`/rfp/${id}`);
+    return data;
+  },
+
+  upload: async (file: File): Promise<UploadResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const { data } = await api.post<UploadResponse>('/rfp/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return data;
+  },
+
+  makeDecision: async (id: string, decision: RFPDecision): Promise<RFPDetail> => {
+    const { data } = await api.post<RFPDetail>(`/rfp/${id}/decision`, decision);
+    return data;
+  },
+
+  getQuestions: async (id: string): Promise<RFPQuestion[]> => {
+    const { data } = await api.get<RFPQuestion[]>(`/rfp/${id}/questions`);
+    return data;
+  },
+
+  regenerateQuestions: async (id: string): Promise<RFPQuestion[]> => {
+    const { data } = await api.post<RFPQuestion[]>(`/rfp/${id}/questions/regenerate`);
+    return data;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await api.delete(`/rfp/${id}`);
+  },
+};
+
+export default api;

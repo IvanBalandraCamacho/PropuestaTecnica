@@ -1,0 +1,123 @@
+# Docker Compose para RFP Analyzer
+# Stack: Frontend (React+Vite) + Backend (FastAPI) + PostgreSQL
+
+services:
+  # ============================================
+  # PostgreSQL Database
+  # ============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: rfp_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-rfp_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rfp_password}
+      POSTGRES_DB: ${POSTGRES_DB:-rfp_analyzer}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rfp_user} -d ${POSTGRES_DB:-rfp_analyzer}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - rfp_network
+
+  # ============================================
+  # Backend FastAPI
+  # ============================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: rfp_backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Database
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-rfp_user}:${POSTGRES_PASSWORD:-rfp_password}@postgres:5432/${POSTGRES_DB:-rfp_analyzer}
+      
+      # App
+      DEBUG: ${DEBUG:-true}
+      
+      # GCP Cloud Storage
+      GCP_PROJECT_ID: ${GCP_PROJECT_ID:-}
+      GCP_LOCATION: ${GCP_LOCATION:-us-central1}
+      GCS_BUCKET: ${GCS_BUCKET:-}
+      GOOGLE_APPLICATION_CREDENTIALS: /app/gcp-credentials.json
+      
+      # Google AI API (Gemini)
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3-pro-preview}
+      
+      # JWT
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-super-secret-key-change-in-production}
+      
+      # CORS
+      CORS_ORIGINS: '["http://localhost:3000", "http://localhost:5173", "http://frontend:80"]'
+    volumes:
+      - ./backend:/app
+      - ./gcp-credentials.json:/app/gcp-credentials.json:ro
+      - rfp_uploads:/app/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - rfp_network
+
+  # ============================================
+  # Frontend React + Vite
+  # ============================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: http://localhost:8000/api/v1
+    container_name: rfp_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    networks:
+      - rfp_network
+
+  # ============================================
+  # PgAdmin (opcional para desarrollo)
+  # ============================================
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: rfp_pgadmin
+    restart: unless-stopped
+    profiles:
+      - dev
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL:-admin@rfp.local}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD:-admin}
+    ports:
+      - "5050:80"
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    depends_on:
+      - postgres
+    networks:
+      - rfp_network
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+  rfp_uploads:
+
+networks:
+  rfp_network:
+    driver: bridge
