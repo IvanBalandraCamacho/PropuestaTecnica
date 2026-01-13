@@ -64,4 +64,7 @@ mcp/.env
 **/tmp/
 **/test-report.html
 **/test-report.md
-*.html
+
+# Ignore test HTML reports but not demo.html
+mcp/testsprite_tests/*.html
+
