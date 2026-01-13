@@ -48,3 +48,20 @@ Thumbs.db
 # Database
 *.db
 *.sqlite3
+
+# Excel files (data sources - not tracked)
+*.xlsx
+*.xls
+
+# MCP specific
+mcp/lancedb_data/
+mcp/__pycache__/
+mcp/tests/__pycache__/
+mcp/testsprite_tests/
+mcp/.env
+
+# Test reports and temp files
+**/tmp/
+**/test-report.html
+**/test-report.md
+*.html
