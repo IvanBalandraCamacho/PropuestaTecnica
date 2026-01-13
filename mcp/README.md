@@ -2,6 +2,8 @@
 
 Sistema de búsqueda semántica de talento para Team Building automatizado en licitaciones (RFP).
 
+> **Documentación técnica completa:** Ver [docs/docs.md](docs/docs.md)
+
 ## Características Principales
 
 | Feature | Descripción |
