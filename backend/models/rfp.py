@@ -93,6 +93,7 @@ class RFPSubmission(Base):
     # Campos indexados para búsqueda/filtros
     title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     client_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    client_acronym: Mapped[str | None] = mapped_column(String(50), nullable=True)
     country: Mapped[str | None] = mapped_column(String(100), nullable=True)
     category: Mapped[str | None] = mapped_column(String(50), nullable=True)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)

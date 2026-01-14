@@ -41,7 +41,8 @@ Analiza el siguiente documento RFP y extrae la información estructurada en form
 
 {
     "title": "Título oficial del proyecto o licitación",
-    "client_name": "Nombre del cliente/empresa que emite el RFP",
+    "client_name": "Nombre COMPLETO del cliente/empresa",
+    "client_acronym": "Siglas o abreviatura del cliente (ej: BCP, INDAP, BBVA)",
     "country": "País del cliente",
     "category": "Categoría del proyecto (infraestructura, desarrollo, cloud, seguridad, etc.)",
     "summary": "Resumen ejecutivo del RFP en máximo 3 párrafos",
@@ -297,6 +298,7 @@ class RFPAnalyzerService:
         return {
             "title": extracted_data.get("title"),
             "client_name": extracted_data.get("client_name"),
+            "client_acronym": extracted_data.get("client_acronym"),
             "country": extracted_data.get("country"),
             "category": extracted_data.get("category"),
             "summary": extracted_data.get("summary"),
