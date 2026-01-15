@@ -63,25 +63,14 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRATION_MINUTES: int = 60 * 24 * 7  # 7 days
     
-    # CORS
-    CORS_ORIGINS: list[str] | str = ["http://localhost:3000", "http://localhost:5173"]
-    
-    @field_validator('CORS_ORIGINS', mode='before')
-    @classmethod
-    def parse_cors_origins(cls, v):
-        """Parse CORS_ORIGINS from JSON string, comma-separated string, or list."""
-        if isinstance(v, list):
-            return v
-        if isinstance(v, str):
-            # Try parsing as JSON first
-            if v.startswith('['):
-                try:
-                    return json.loads(v)
-                except json.JSONDecodeError:
-                    pass
-            # Parse as comma-separated string
-            return [origin.strip() for origin in v.split(',') if origin.strip()]
-        return v
+    # CORS (Separated by comma)
+    CORS_ORIGINS: str = "*" 
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        if self.CORS_ORIGINS == "*":
+            return ["*"]
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
     
     class Config:
         env_file = ".env"
