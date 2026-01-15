@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 env:
-  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  PROJECT_ID: '${{ secrets.GCP_PROJECT_ID }}'
   REGION: us-central1
   REPO_NAME: rfp-analyzer-repo
   SERVICE_NAME: rfp-mcp
