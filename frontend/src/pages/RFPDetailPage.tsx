@@ -1,22 +1,24 @@
 /**
  * Página de detalle de RFP
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Layout, Typography, Card, Descriptions, Tag, Button, Space, 
-  Spin, Modal, Input, message, Row, Col, Alert, Divider, List, Tabs 
+  Spin, Modal, Input, message, Row, Col, Alert, Divider, List, Tabs,
+  InputNumber, Select, DatePicker
 } from 'antd';
 import { 
   ArrowLeftOutlined, CheckOutlined, CloseOutlined, 
   ExclamationCircleOutlined, CalendarOutlined, DollarOutlined,
-  GlobalOutlined, CodeOutlined, TeamOutlined, SearchOutlined, ReloadOutlined
+  GlobalOutlined, CodeOutlined, TeamOutlined, SearchOutlined, ReloadOutlined,
+  EditOutlined, SaveOutlined, CloseCircleOutlined
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { rfpApi } from '../lib/api';
 import AppLayout from '../components/layout/AppLayout';
 import { TeamEstimationView, CostEstimationView, SuggestedTeamView } from '../components/rfp';
-import type { RFPStatus, Recommendation } from '../types';
+import type { RFPStatus, Recommendation, RFPCategory } from '../types';
 import dayjs from 'dayjs';
 
 const { Title, Text, Paragraph } = Typography;
@@ -64,6 +66,30 @@ const RFPDetailPage: React.FC = () => {
   const [noGoReason, setNoGoReason] = useState('');
   const [noGoModalOpen, setNoGoModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('summary');
+  
+  // Estado de edición
+  const [isEditing, setIsEditing] = useState(false);
+  const [editForm, setEditForm] = useState<{
+    client_name: string;
+    country: string;
+    category: string;
+    budget_min: number | null;
+    budget_max: number | null;
+    currency: string;
+    tvt: string;
+    proposal_deadline: string | null;
+    project_duration: string;
+  }>({
+    client_name: '',
+    country: '',
+    category: '',
+    budget_min: null,
+    budget_max: null,
+    currency: 'USD',
+    tvt: '',
+    proposal_deadline: null,
+    project_duration: '',
+  });
 
   // RFP data
   const { data: rfp, isLoading } = useQuery({
@@ -71,12 +97,28 @@ const RFPDetailPage: React.FC = () => {
     queryFn: () => rfpApi.get(id!),
     enabled: !!id,
   });
+  
+  // Inicializar formulario cuando se cargan los datos
+  useEffect(() => {
+    if (rfp) {
+      setEditForm({
+        client_name: rfp.client_name || '',
+        country: rfp.country || '',
+        category: rfp.category || '',
+        budget_min: rfp.budget_min,
+        budget_max: rfp.budget_max,
+        currency: rfp.currency || 'USD',
+        tvt: rfp.tvt || '',
+        proposal_deadline: rfp.proposal_deadline,
+        project_duration: rfp.project_duration || '',
+      });
+    }
+  }, [rfp]);
 
   // Team estimation data
   const { 
     data: teamData, 
     isLoading: teamDataLoading,
-    refetch: refetchTeamData 
   } = useQuery({
     queryKey: ['rfp-team-estimation', id],
     queryFn: () => rfpApi.getTeamEstimation(id!),
@@ -104,13 +146,52 @@ const RFPDetailPage: React.FC = () => {
     mutationFn: (forceRefresh: boolean = false) => rfpApi.suggestTeam(id!, forceRefresh),
     onSuccess: (data) => {
       message.success(`Se encontraron ${data.suggested_team?.total_candidatos || 0} candidatos`);
-      refetchTeamData();
+      // Actualizar el cache directamente con los datos de la respuesta
+      queryClient.setQueryData(['rfp-team-estimation', id], {
+        team_estimation: data.team_estimation,
+        cost_estimation: data.cost_estimation,
+        suggested_team: data.suggested_team,
+      });
       setActiveTab('candidates');
     },
     onError: (error: any) => {
       message.error(error.response?.data?.detail || 'Error al buscar candidatos');
     },
   });
+
+  // Update RFP mutation
+  const updateRfpMutation = useMutation({
+    mutationFn: (data: typeof editForm) => rfpApi.update(id!, data),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['rfp', id], data);
+      message.success('RFP actualizado exitosamente');
+      setIsEditing(false);
+    },
+    onError: () => {
+      message.error('Error al actualizar el RFP');
+    },
+  });
+
+  const handleSaveEdit = () => {
+    updateRfpMutation.mutate(editForm);
+  };
+
+  const handleCancelEdit = () => {
+    if (rfp) {
+      setEditForm({
+        client_name: rfp.client_name || '',
+        country: rfp.country || '',
+        category: rfp.category || '',
+        budget_min: rfp.budget_min,
+        budget_max: rfp.budget_max,
+        currency: rfp.currency || 'USD',
+        tvt: rfp.tvt || '',
+        proposal_deadline: rfp.proposal_deadline,
+        project_duration: rfp.project_duration || '',
+      });
+    }
+    setIsEditing(false);
+  };
 
   const handleGo = () => {
     decisionMutation.mutate({ decision: 'go' });
@@ -166,29 +247,169 @@ const RFPDetailPage: React.FC = () => {
         <Row gutter={24}>
           {/* Main Info */}
           <Col span={16}>
-            <Card title="Información del RFP" style={{ marginBottom: 24 }}>
-              <Descriptions column={2}>
-                <Descriptions.Item label={<><GlobalOutlined /> País</>}>
-                  {rfp.country || '-'}
-                </Descriptions.Item>
-                <Descriptions.Item label="Categoría">
-                  {rfp.category?.replace(/_/g, ' ') || '-'}
-                </Descriptions.Item>
-                <Descriptions.Item label={<><DollarOutlined /> Presupuesto</>}>
-                  {rfp.budget_min || rfp.budget_max ? (
-                    `${rfp.currency} ${rfp.budget_min?.toLocaleString() || '?'} - ${rfp.budget_max?.toLocaleString() || '?'}`
-                  ) : '-'}
-                </Descriptions.Item>
-                <Descriptions.Item label={<><CalendarOutlined /> Deadline Propuesta</>}>
-                  {rfp.proposal_deadline ? dayjs(rfp.proposal_deadline).format('DD/MM/YYYY') : '-'}
-                </Descriptions.Item>
-                <Descriptions.Item label="Duración Proyecto">
-                  {rfp.project_duration || '-'}
-                </Descriptions.Item>
-                <Descriptions.Item label="Confianza IA">
-                  {rfp.confidence_score ? `${rfp.confidence_score}%` : '-'}
-                </Descriptions.Item>
-              </Descriptions>
+            <Card 
+              title="Información del RFP" 
+              style={{ marginBottom: 24 }}
+              extra={
+                isEditing ? (
+                  <Space>
+                    <Button 
+                      type="primary" 
+                      icon={<SaveOutlined />} 
+                      onClick={handleSaveEdit}
+                      loading={updateRfpMutation.isPending}
+                    >
+                      Guardar
+                    </Button>
+                    <Button 
+                      icon={<CloseCircleOutlined />} 
+                      onClick={handleCancelEdit}
+                    >
+                      Cancelar
+                    </Button>
+                  </Space>
+                ) : (
+                  <Button 
+                    icon={<EditOutlined />} 
+                    onClick={() => setIsEditing(true)}
+                  >
+                    Editar
+                  </Button>
+                )
+              }
+            >
+              {isEditing ? (
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div>
+                    <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>Cliente</Text>
+                    <Input
+                      value={editForm.client_name}
+                      onChange={(e) => setEditForm({ ...editForm, client_name: e.target.value })}
+                      placeholder="Nombre del cliente"
+                    />
+                  </div>
+                  <div>
+                    <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>TVT</Text>
+                    <Input
+                      value={editForm.tvt}
+                      onChange={(e) => setEditForm({ ...editForm, tvt: e.target.value })}
+                      placeholder="Número TVT (ej: 001234)"
+                    />
+                  </div>
+                  <div>
+                    <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}><GlobalOutlined /> País</Text>
+                    <Input
+                      value={editForm.country}
+                      onChange={(e) => setEditForm({ ...editForm, country: e.target.value })}
+                      placeholder="País"
+                    />
+                  </div>
+                  <div>
+                    <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>Categoría</Text>
+                    <Select
+                      value={editForm.category || undefined}
+                      onChange={(value) => setEditForm({ ...editForm, category: value })}
+                      placeholder="Seleccionar categoría"
+                      style={{ width: '100%' }}
+                      allowClear
+                    >
+                      <Select.Option value="mantencion">Mantención</Select.Option>
+                      <Select.Option value="desarrollo">Desarrollo</Select.Option>
+                      <Select.Option value="analitica">Analítica</Select.Option>
+                      <Select.Option value="ia_chatbot">IA Chatbot</Select.Option>
+                      <Select.Option value="ia_documentos">IA Documentos</Select.Option>
+                      <Select.Option value="ia_video">IA Video</Select.Option>
+                      <Select.Option value="otro">Otro</Select.Option>
+                    </Select>
+                  </div>
+                  <div>
+                    <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}><DollarOutlined /> Presupuesto Mín</Text>
+                    <InputNumber
+                      value={editForm.budget_min}
+                      onChange={(value) => setEditForm({ ...editForm, budget_min: value })}
+                      placeholder="Mínimo"
+                      style={{ width: '100%' }}
+                      formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    />
+                  </div>
+                  <div>
+                    <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}><DollarOutlined /> Presupuesto Máx</Text>
+                    <InputNumber
+                      value={editForm.budget_max}
+                      onChange={(value) => setEditForm({ ...editForm, budget_max: value })}
+                      placeholder="Máximo"
+                      style={{ width: '100%' }}
+                      formatter={(value) => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                    />
+                  </div>
+                  <div>
+                    <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>Moneda</Text>
+                    <Select
+                      value={editForm.currency}
+                      onChange={(value) => setEditForm({ ...editForm, currency: value })}
+                      style={{ width: '100%' }}
+                    >
+                      <Select.Option value="USD">USD</Select.Option>
+                      <Select.Option value="CLP">CLP</Select.Option>
+                      <Select.Option value="EUR">EUR</Select.Option>
+                      <Select.Option value="BRL">BRL</Select.Option>
+                      <Select.Option value="MXN">MXN</Select.Option>
+                      <Select.Option value="COP">COP</Select.Option>
+                      <Select.Option value="PEN">PEN</Select.Option>
+                    </Select>
+                  </div>
+                  <div>
+                    <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}><CalendarOutlined /> Deadline Propuesta</Text>
+                    <DatePicker
+                      value={editForm.proposal_deadline ? dayjs(editForm.proposal_deadline) : null}
+                      onChange={(date) => setEditForm({ ...editForm, proposal_deadline: date ? date.format('YYYY-MM-DD') : null })}
+                      format="DD/MM/YYYY"
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+                  <div>
+                    <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>Duración Proyecto</Text>
+                    <Input
+                      value={editForm.project_duration}
+                      onChange={(e) => setEditForm({ ...editForm, project_duration: e.target.value })}
+                      placeholder="Ej: 12 meses"
+                    />
+                  </div>
+                  <div>
+                    <Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>Confianza IA</Text>
+                    <Text>{rfp.confidence_score ? `${rfp.confidence_score}%` : '-'}</Text>
+                  </div>
+                </div>
+              ) : (
+                <Descriptions column={2}>
+                  <Descriptions.Item label="Cliente">
+                    {rfp.client_name || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="TVT">
+                    {rfp.tvt || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label={<><GlobalOutlined /> País</>}>
+                    {rfp.country || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Categoría">
+                    {rfp.category?.replace(/_/g, ' ') || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label={<><DollarOutlined /> Presupuesto</>}>
+                    {rfp.budget_min || rfp.budget_max ? (
+                      `${rfp.currency} ${rfp.budget_min?.toLocaleString() || '?'} - ${rfp.budget_max?.toLocaleString() || '?'}`
+                    ) : '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label={<><CalendarOutlined /> Deadline Propuesta</>}>
+                    {rfp.proposal_deadline ? dayjs(rfp.proposal_deadline).format('DD/MM/YYYY') : '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Duración Proyecto">
+                    {rfp.project_duration || '-'}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="Confianza IA">
+                    {rfp.confidence_score ? `${rfp.confidence_score}%` : '-'}
+                  </Descriptions.Item>
+                </Descriptions>
+              )}
               
               {rfp.summary && (
                 <>

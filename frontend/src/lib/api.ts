@@ -186,6 +186,24 @@ export const rfpApi = {
     }>(`/rfp/${id}/team-estimation`);
     return data;
   },
+
+  /**
+   * Actualiza campos editables del RFP
+   */
+  update: async (id: string, updateData: {
+    client_name?: string;
+    country?: string;
+    category?: string;
+    budget_min?: number;
+    budget_max?: number;
+    currency?: string;
+    tvt?: string;
+    proposal_deadline?: string;
+    project_duration?: string;
+  }): Promise<RFPDetail> => {
+    const { data } = await api.patch<RFPDetail>(`/rfp/${id}`, updateData);
+    return data;
+  },
 };
 
 // ============ CERTIFICATIONS ============

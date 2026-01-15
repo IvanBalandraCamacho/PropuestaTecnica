@@ -65,15 +65,15 @@ USER appuser
 
 # Environment variables (can be overridden)
 ENV MCP_MODE=http
-ENV MCP_PORT=8083
+ENV MCP_PORT=8080
 ENV PYTHONUNBUFFERED=1
 
 # Expose port
-EXPOSE 8083
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8083/health || exit 1
+    CMD curl -f http://localhost:8080/health || exit 1
 
 # Default command
 CMD ["python", "server.py"]

@@ -23,6 +23,7 @@ from models.schemas import (
     RFPSummary,
     RFPDetail,
     RFPDecision,
+    RFPUpdate,
     UploadResponse,
     RFPListResponse,
     RFPQuestion as RFPQuestionSchema,
@@ -307,6 +308,46 @@ async def get_rfp(
     
     if not rfp:
         raise HTTPException(status_code=404, detail="RFP no encontrado")
+    
+    return RFPDetail.model_validate(rfp)
+
+
+@router.patch("/{rfp_id}", response_model=RFPDetail)
+async def update_rfp(
+    rfp_id: UUID,
+    rfp_update: RFPUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Actualiza campos editables del RFP.
+    
+    Campos editables:
+    - client_name, country, category
+    - budget_min, budget_max, currency
+    - tvt, proposal_deadline, project_duration
+    """
+    result = await db.execute(
+        select(RFPSubmission)
+        .options(selectinload(RFPSubmission.questions))
+        .where(RFPSubmission.id == rfp_id)
+    )
+    rfp = result.scalar_one_or_none()
+    
+    if not rfp:
+        raise HTTPException(status_code=404, detail="RFP no encontrado")
+    
+    # Actualizar solo los campos proporcionados
+    update_data = rfp_update.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(rfp, field, value)
+    
+    rfp.updated_at = datetime.utcnow()
+    
+    await db.commit()
+    await db.refresh(rfp)
+    
+    logger.info(f"RFP {rfp_id} updated: {list(update_data.keys())}")
     
     return RFPDetail.model_validate(rfp)
 

@@ -2,9 +2,10 @@
 Configuración centralizada del backend.
 Usa Pydantic Settings para validación y carga desde env vars.
 """
+import json
 from functools import lru_cache
 from pydantic_settings import BaseSettings
-from pydantic import Field
+from pydantic import Field, field_validator
 
 
 class Settings(BaseSettings):
@@ -53,7 +54,7 @@ class Settings(BaseSettings):
     
     # MCP Talent Search Server
     MCP_TALENT_URL: str = Field(
-        default="http://localhost:8083",
+        default="https://mcp-tivit.eastus2.cloudapp.azure.com",
         description="URL of the MCP Talent Search Server"
     )
     
@@ -62,8 +63,14 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     JWT_EXPIRATION_MINUTES: int = 60 * 24 * 7  # 7 days
     
-    # CORS
-    CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://localhost:5173"]
+    # CORS (Separated by comma)
+    CORS_ORIGINS: str = "*" 
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        if self.CORS_ORIGINS == "*":
+            return ["*"]
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
     
     class Config:
         env_file = ".env"
