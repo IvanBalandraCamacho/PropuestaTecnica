@@ -3,7 +3,7 @@ name: Build and Deploy MCP
 on:
   push:
     branches:
-      - dev
+      - main
     paths:
       - 'mcp/**'
       - '.github/workflows/mcp.yml'
