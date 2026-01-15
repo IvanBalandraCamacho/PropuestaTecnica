@@ -43,12 +43,14 @@ jobs:
         run: |
           docker push ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
-      - name: Deploy to Cloud Run
-        run: |
-          gcloud run deploy ${{ env.SERVICE_NAME }} \
-            --image ${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }} \
-            --region ${{ env.REGION }} \
-            --platform managed \
-            --allow-unauthenticated \
-            --port 8080 \
-            --set-env-vars MCP_MODE=http,MCP_PORT=8080,GOOGLE_API_KEY=${{ secrets.GEMINI_API_KEY }}
+      - name: 'Deploy to Cloud Run'
+        uses: 'google-github-actions/deploy-cloudrun@v2'
+        with:
+          service: '${{ env.SERVICE_NAME }}'
+          image: '${{ env.REGION }}-docker.pkg.dev/${{ env.PROJECT_ID }}/${{ env.REPO_NAME }}/${{ env.IMAGE_NAME }}:${{ github.sha }}'
+          region: '${{ env.REGION }}'
+          flags: '--allow-unauthenticated --port 8080'
+          env_vars: |
+            MCP_MODE=http
+            MCP_PORT=8080
+            GOOGLE_API_KEY=${{ secrets.GEMINI_API_KEY }}
