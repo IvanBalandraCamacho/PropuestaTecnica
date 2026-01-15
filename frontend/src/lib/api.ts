@@ -12,6 +12,7 @@ import type {
   RFPDetail,
   RFPQuestion,
   RFPDecision,
+  RFPUpdate,
   UploadResponse,
   TeamSuggestionResponse,
   TeamEstimation,
@@ -130,6 +131,11 @@ export const rfpApi = {
 
   get: async (id: string): Promise<RFPDetail> => {
     const { data } = await api.get<RFPDetail>(`/rfp/${id}`);
+    return data;
+  },
+
+  update: async (id: string, updateData: RFPUpdate): Promise<RFPDetail> => {
+    const { data } = await api.patch<RFPDetail>(`/rfp/${id}`, updateData);
     return data;
   },
 

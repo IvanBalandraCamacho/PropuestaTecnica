@@ -1,22 +1,24 @@
 /**
  * Página de detalle de RFP
  */
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
   Layout, Typography, Card, Descriptions, Tag, Button, Space, 
-  Spin, Modal, Input, message, Row, Col, Alert, Divider, List, Tabs 
+  Spin, Modal, Input, message, Row, Col, Alert, Divider, List, Tabs,
+  Form, Select, DatePicker, InputNumber
 } from 'antd';
 import { 
   ArrowLeftOutlined, CheckOutlined, CloseOutlined, 
   ExclamationCircleOutlined, CalendarOutlined, DollarOutlined,
-  GlobalOutlined, CodeOutlined, TeamOutlined, SearchOutlined, ReloadOutlined
+  GlobalOutlined, CodeOutlined, TeamOutlined, SearchOutlined, ReloadOutlined,
+  EditOutlined, SaveOutlined, CloseCircleOutlined
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { rfpApi } from '../lib/api';
 import AppLayout from '../components/layout/AppLayout';
 import { TeamEstimationView, CostEstimationView, SuggestedTeamView } from '../components/rfp';
-import type { RFPStatus, Recommendation } from '../types';
+import type { RFPStatus, Recommendation, RFPUpdate } from '../types';
 import dayjs from 'dayjs';
 
 const { Title, Text, Paragraph } = Typography;
@@ -64,6 +66,8 @@ const RFPDetailPage: React.FC = () => {
   const [noGoReason, setNoGoReason] = useState('');
   const [noGoModalOpen, setNoGoModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState('summary');
+  const [isEditing, setIsEditing] = useState(false);
+  const [form] = Form.useForm();
 
   // RFP data
   const { data: rfp, isLoading } = useQuery({
@@ -71,6 +75,23 @@ const RFPDetailPage: React.FC = () => {
     queryFn: () => rfpApi.get(id!),
     enabled: !!id,
   });
+
+  // Initialize form when RFP data loads
+  useEffect(() => {
+    if (rfp) {
+      form.setFieldsValue({
+        client_name: rfp.client_name,
+        country: rfp.country,
+        category: rfp.category,
+        tvt: rfp.tvt,
+        budget_min: rfp.budget_min,
+        budget_max: rfp.budget_max,
+        currency: rfp.currency,
+        proposal_deadline: rfp.proposal_deadline ? dayjs(rfp.proposal_deadline) : null,
+        project_duration: rfp.project_duration,
+      });
+    }
+  }, [rfp, form]);
 
   // Team estimation data
   const { 
@@ -80,6 +101,19 @@ const RFPDetailPage: React.FC = () => {
     queryKey: ['rfp-team-estimation', id],
     queryFn: () => rfpApi.getTeamEstimation(id!),
     enabled: !!id && rfp?.status !== 'pending' && rfp?.status !== 'analyzing',
+  });
+
+  // Update RFP mutation
+  const updateMutation = useMutation({
+    mutationFn: (data: RFPUpdate) => rfpApi.update(id!, data),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['rfp', id], data);
+      message.success('Información actualizada correctamente');
+      setIsEditing(false);
+    },
+    onError: (error: any) => {
+      message.error(error.response?.data?.detail || 'Error al actualizar');
+    },
   });
 
   // Decision mutation
@@ -134,6 +168,52 @@ const RFPDetailPage: React.FC = () => {
     suggestTeamMutation.mutate(forceRefresh);
   };
 
+  const handleSaveEdit = async () => {
+    try {
+      const values = await form.validateFields();
+      const updateData: RFPUpdate = {
+        client_name: values.client_name,
+        country: values.country,
+        category: values.category,
+        tvt: values.tvt,
+        budget_min: values.budget_min,
+        budget_max: values.budget_max,
+        currency: values.currency,
+        proposal_deadline: values.proposal_deadline ? values.proposal_deadline.format('YYYY-MM-DD') : null,
+        project_duration: values.project_duration,
+      };
+      updateMutation.mutate(updateData);
+    } catch (error) {
+      // Validation error
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    // Reset form to original values
+    if (rfp) {
+      form.setFieldsValue({
+        client_name: rfp.client_name,
+        country: rfp.country,
+        category: rfp.category,
+        tvt: rfp.tvt,
+        budget_min: rfp.budget_min,
+        budget_max: rfp.budget_max,
+        currency: rfp.currency,
+        proposal_deadline: rfp.proposal_deadline ? dayjs(rfp.proposal_deadline) : null,
+        project_duration: rfp.project_duration,
+      });
+    }
+  };
+
+  // Validar que TVT solo tenga números
+  const validateTVT = (_: unknown, value: string) => {
+    if (value && !/^\d*$/.test(value)) {
+      return Promise.reject('Solo se permiten números');
+    }
+    return Promise.resolve();
+  };
+
   if (isLoading) {
     return (
       <AppLayout>
@@ -170,29 +250,143 @@ const RFPDetailPage: React.FC = () => {
         <Row gutter={24}>
           {/* Main Info */}
           <Col span={16}>
-            <Card title="Información del RFP" style={{ marginBottom: 24 }}>
-              <Descriptions column={2}>
-                <Descriptions.Item label={<><GlobalOutlined /> País</>}>
-                  {rfp.country || '-'}
-                </Descriptions.Item>
-                <Descriptions.Item label="Categoría">
-                  {rfp.category?.replace(/_/g, ' ') || '-'}
-                </Descriptions.Item>
-                <Descriptions.Item label={<><DollarOutlined /> Presupuesto</>}>
-                  {rfp.budget_min || rfp.budget_max ? (
-                    `${rfp.currency} ${rfp.budget_min?.toLocaleString() || '?'} - ${rfp.budget_max?.toLocaleString() || '?'}`
-                  ) : '-'}
-                </Descriptions.Item>
-                <Descriptions.Item label={<><CalendarOutlined /> Deadline Propuesta</>}>
-                  {rfp.proposal_deadline ? dayjs(rfp.proposal_deadline).format('DD/MM/YYYY') : '-'}
-                </Descriptions.Item>
-                <Descriptions.Item label="Duración Proyecto">
-                  {rfp.project_duration || '-'}
-                </Descriptions.Item>
-                <Descriptions.Item label="Confianza IA">
-                  {rfp.confidence_score ? `${rfp.confidence_score}%` : '-'}
-                </Descriptions.Item>
-              </Descriptions>
+            <Card 
+              title="Información del RFP" 
+              style={{ marginBottom: 24 }}
+              extra={
+                !isEditing ? (
+                  <Button 
+                    icon={<EditOutlined />} 
+                    onClick={() => setIsEditing(true)}
+                  >
+                    Editar
+                  </Button>
+                ) : (
+                  <Space>
+                    <Button 
+                      icon={<CloseCircleOutlined />} 
+                      onClick={handleCancelEdit}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button 
+                      type="primary" 
+                      icon={<SaveOutlined />} 
+                      onClick={handleSaveEdit}
+                      loading={updateMutation.isPending}
+                    >
+                      Guardar
+                    </Button>
+                  </Space>
+                )
+              }
+            >
+              {!isEditing ? (
+                <>
+                  <Descriptions column={2}>
+                    <Descriptions.Item label={<><GlobalOutlined /> País</>}>
+                      {rfp.country || '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Categoría">
+                      {rfp.category?.replace(/_/g, ' ') || '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="TVT">
+                      {rfp.tvt || '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label={<><DollarOutlined /> Presupuesto</>}>
+                      {rfp.budget_min || rfp.budget_max ? (
+                        `${rfp.currency} ${rfp.budget_min?.toLocaleString() || '?'} - ${rfp.budget_max?.toLocaleString() || '?'}`
+                      ) : '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label={<><CalendarOutlined /> Deadline Propuesta</>}>
+                      {rfp.proposal_deadline ? dayjs(rfp.proposal_deadline).format('DD/MM/YYYY') : '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Duración Proyecto">
+                      {rfp.project_duration || '-'}
+                    </Descriptions.Item>
+                    <Descriptions.Item label="Confianza IA">
+                      {rfp.confidence_score ? `${rfp.confidence_score}%` : '-'}
+                    </Descriptions.Item>
+                  </Descriptions>
+                </>
+              ) : (
+                <Form form={form} layout="vertical">
+                  <Row gutter={16}>
+                    <Col span={12}>
+                      <Form.Item label="Cliente" name="client_name">
+                        <Input placeholder="Nombre del cliente" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item label="País" name="country">
+                        <Input placeholder="País" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item label="Categoría" name="category">
+                        <Select placeholder="Seleccione categoría">
+                          <Select.Option value="mantencion_aplicaciones">Mantención Aplicaciones</Select.Option>
+                          <Select.Option value="desarrollo_software">Desarrollo Software</Select.Option>
+                          <Select.Option value="analitica">Analítica</Select.Option>
+                          <Select.Option value="ia_chatbot">IA Chatbot</Select.Option>
+                          <Select.Option value="ia_documentos">IA Documentos</Select.Option>
+                          <Select.Option value="ia_video">IA Video</Select.Option>
+                          <Select.Option value="otro">Otro</Select.Option>
+                        </Select>
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item 
+                        label="TVT" 
+                        name="tvt"
+                        rules={[{ validator: validateTVT }]}
+                        tooltip="Solo números. Puede iniciar con 0."
+                      >
+                        <Input placeholder="Ej: 0123456" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={8}>
+                      <Form.Item label="Presupuesto Mín" name="budget_min">
+                        <InputNumber 
+                          style={{ width: '100%' }} 
+                          placeholder="Mínimo"
+                          formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col span={8}>
+                      <Form.Item label="Presupuesto Máx" name="budget_max">
+                        <InputNumber 
+                          style={{ width: '100%' }} 
+                          placeholder="Máximo"
+                          formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                        />
+                      </Form.Item>
+                    </Col>
+                    <Col span={8}>
+                      <Form.Item label="Moneda" name="currency">
+                        <Select placeholder="Moneda">
+                          <Select.Option value="USD">USD</Select.Option>
+                          <Select.Option value="CLP">CLP</Select.Option>
+                          <Select.Option value="EUR">EUR</Select.Option>
+                          <Select.Option value="BRL">BRL</Select.Option>
+                          <Select.Option value="MXN">MXN</Select.Option>
+                        </Select>
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item label="Deadline Propuesta" name="proposal_deadline">
+                        <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+                      </Form.Item>
+                    </Col>
+                    <Col span={12}>
+                      <Form.Item label="Duración Proyecto" name="project_duration">
+                        <Input placeholder="Ej: 12 meses" />
+                      </Form.Item>
+                    </Col>
+                  </Row>
+                </Form>
+              )}
               
               {rfp.summary && (
                 <>

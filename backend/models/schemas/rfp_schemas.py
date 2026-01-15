@@ -77,6 +77,19 @@ class RFPDecision(BaseModel):
     reason: str | None = Field(None, description="Reason for the decision")
 
 
+class RFPUpdate(BaseModel):
+    """Schema for updating RFP fields."""
+    client_name: str | None = None
+    country: str | None = None
+    category: str | None = None
+    tvt: str | None = None  # Solo números, pero string para permitir 0s iniciales
+    budget_min: float | None = None
+    budget_max: float | None = None
+    currency: str | None = None
+    proposal_deadline: date | None = None
+    project_duration: str | None = None
+
+
 class RFPQuestion(BaseModel):
     """Schema for a question."""
     model_config = ConfigDict(from_attributes=True)
@@ -104,6 +117,7 @@ class RFPSummary(BaseModel):
     country: str | None = None
     category: str | None = None
     summary: str | None = None
+    tvt: str | None = None  # Solo números, pero string para permitir 0s iniciales
     budget_min: float | None = None
     budget_max: float | None = None
     currency: str = "USD"
