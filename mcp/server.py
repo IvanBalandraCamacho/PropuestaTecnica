@@ -1118,7 +1118,7 @@ def main():
         initialize_vector_db()
         mcp.run()
     else:
-        port = int(os.environ.get("MCP_PORT", "8083"))
+        port = int(os.environ.get("MCP_PORT", "8080"))
         logger.info(f"Modo HTTP en puerto {port}")
         logger.info(f"Documentación: http://localhost:{port}/docs")
         uvicorn.run("server:app", host="0.0.0.0", port=port, reload=False)
