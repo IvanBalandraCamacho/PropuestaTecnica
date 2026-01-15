@@ -1,5 +1,5 @@
-# Docker Compose para RFP Analyzer
-# Stack: Frontend (React+Vite) + Backend (FastAPI) + PostgreSQL
+# Docker Compose para TIVIT Proposals
+# Stack: Frontend (React+Vite) + Backend (FastAPI) + MCP Talent Search + PostgreSQL
 
 services:
   # ============================================
@@ -19,7 +19,7 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rfp_user} -d ${POSTGRES_DB:-rfp_analyzer}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rfp_user} -d ${POSTGRES_DB:-rfp_analyzer}" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -38,36 +38,36 @@ services:
     ports:
       - "8000:8000"
     environment:
-      # Database
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-rfp_user}:${POSTGRES_PASSWORD:-rfp_password}@postgres:5432/${POSTGRES_DB:-rfp_analyzer}
-      
+      # Database (Supabase Cloud)
+      DATABASE_URL: ${DATABASE_URL}
+
       # App
       DEBUG: ${DEBUG:-true}
-      
+
       # GCP Cloud Storage
       GCP_PROJECT_ID: ${GCP_PROJECT_ID:-}
       GCP_LOCATION: ${GCP_LOCATION:-us-central1}
       GCS_BUCKET: ${GCS_BUCKET:-}
       GOOGLE_APPLICATION_CREDENTIALS: /app/gcp-credentials.json
-      
+
       # Google AI API (Gemini)
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3-pro-preview}
-      
+
+      # MCP Talent Search
+      MCP_TALENT_URL: http://mcp:8080
+
       # JWT
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-super-secret-key-change-in-production}
-      
+
       # CORS
       CORS_ORIGINS: '["http://localhost:3000", "http://localhost:5173", "http://frontend:80"]'
     volumes:
       - ./backend:/app
       - ./gcp-credentials.json:/app/gcp-credentials.json:ro
       - rfp_uploads:/app/uploads
-    depends_on:
-      postgres:
-        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -89,6 +89,40 @@ services:
       - "5173:80"
     depends_on:
       - backend
+    networks:
+      - rfp_network
+
+  # ============================================
+  # MCP Talent Search API
+  # ============================================
+  mcp:
+    build:
+      context: ./mcp
+      dockerfile: Dockerfile
+    container_name: rfp_mcp
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # MCP Configuration
+      MCP_MODE: http
+      MCP_PORT: 8080
+
+      # Google AI API (for /chat endpoint)
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      GEMINI_MODEL: ${MCP_GEMINI_MODEL:-gemini-2.5-flash-preview-05-20}
+    volumes:
+      # Mount data files (Excel sources)
+      - ./mcp/Capital_Intelectual.xlsx:/app/Capital_Intelectual.xlsx:ro
+      - ./mcp/Census.xlsx:/app/Census.xlsx:ro
+      # Persist LanceDB vector indices
+      - mcp_lancedb:/app/lancedb_data
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
     networks:
       - rfp_network
 
@@ -117,6 +151,8 @@ volumes:
   postgres_data:
   pgadmin_data:
   rfp_uploads:
+  mcp_lancedb:
+
 
 networks:
   rfp_network:

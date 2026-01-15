@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import settings
 from core.database import engine, Base
-from api.routes import rfp_router, dashboard_router, auth_router
+from api.routes import rfp_router, dashboard_router, auth_router, proposal_router, certifications_router, experiences_router, chapters_router
 
 # Configurar logging
 logging.basicConfig(
@@ -60,6 +60,10 @@ app.add_middleware(
 app.include_router(auth_router, prefix=settings.API_V1_PREFIX)
 app.include_router(rfp_router, prefix=settings.API_V1_PREFIX)
 app.include_router(dashboard_router, prefix=settings.API_V1_PREFIX)
+app.include_router(proposal_router, prefix=settings.API_V1_PREFIX)
+app.include_router(certifications_router, prefix=settings.API_V1_PREFIX)
+app.include_router(experiences_router, prefix=settings.API_V1_PREFIX)
+app.include_router(chapters_router, prefix=settings.API_V1_PREFIX)
 
 
 # Health check

@@ -33,7 +33,7 @@ export interface AuthToken {
 
 export type RFPStatus = 'pending' | 'analyzing' | 'analyzed' | 'go' | 'no_go' | 'error';
 
-export type RFPCategory = 
+export type RFPCategory =
   | 'mantencion_aplicaciones'
   | 'desarrollo_software'
   | 'analitica'
@@ -44,9 +44,15 @@ export type RFPCategory =
 
 export type Recommendation = 'strong_go' | 'go' | 'conditional_go' | 'no_go' | 'strong_no_go';
 
+export interface RecommendedISO {
+  id: string;
+  level: 'high' | 'medium' | 'low';
+}
+
 export interface RFPSummary {
   id: string;
   file_name: string;
+  title: string | null;
   status: RFPStatus;
   client_name: string | null;
   country: string | null;
@@ -82,6 +88,7 @@ export interface RFPDetail extends RFPSummary {
   questions_deadline: string | null;
   project_duration: string | null;
   confidence_score: number | null;
+  recommended_isos: RecommendedISO[] | null;
   decision_reason: string | null;
   decided_at: string | null;
   updated_at: string;
@@ -130,6 +137,7 @@ export interface ExtractedRFPData {
   recommendation: Recommendation | null;
   recommendation_reasons: string[];
   confidence_score: number | null;
+  recommended_isos?: RecommendedISO[];
 }
 
 // ============ DASHBOARD ============
@@ -163,4 +171,153 @@ export interface UploadResponse {
   file_name: string;
   status: RFPStatus;
   message: string;
+}
+
+// ============ TEAM & COST ESTIMATION ============
+
+export type Scenario = 'A' | 'B' | 'C' | 'D';
+export type Seniority = 'junior' | 'mid' | 'senior' | 'lead';
+export type Dedication = 'full_time' | 'part_time';
+export type ViabilityAssessment = 'viable' | 'under_budget' | 'over_budget' | 'needs_review';
+
+export interface MarketRate {
+  min: number;
+  max: number;
+  average: number;
+  currency: string;
+  period: string;
+  source: string | null;
+}
+
+export interface RoleEstimation {
+  role_id: string;
+  title: string;
+  quantity: number;
+  seniority: Seniority;
+  required_skills: string[];
+  required_certifications: string[];
+  dedication: Dedication;
+  duration_months: number | null;
+  market_rate: MarketRate | null;
+  subtotal_monthly: number | null;
+  justification: string | null;
+}
+
+export interface TeamEstimation {
+  source: 'client_specified' | 'ai_estimated';
+  scenario: Scenario;
+  confidence: number;
+  roles: RoleEstimation[];
+  total_headcount: number;
+  rationale: string | null;
+}
+
+export interface CostBreakdownItem {
+  role: string;
+  quantity: number;
+  monthly_rate: number;
+  subtotal: number;
+}
+
+export interface ViabilityAnalysis {
+  client_budget: number | null;
+  required_budget: number;
+  gap: number;
+  gap_percent: number;
+  is_viable: boolean;
+  assessment: ViabilityAssessment;
+  recommendations: string[];
+}
+
+export interface CostEstimation {
+  scenario: Scenario;
+  scenario_description: string | null;
+  monthly_base: number;
+  currency: string;
+  source: string;
+  breakdown: CostBreakdownItem[];
+  margin_percent: number;
+  margin_amount: number;
+  suggested_monthly: number | null;
+  duration_months: number | null;
+  suggested_total: number | null;
+  viability: ViabilityAnalysis | null;
+}
+
+export interface MCPCandidate {
+  matricula: string;
+  nombre: string;
+  email: string;
+  cargo: string;
+  pais: string | null;
+  score: number;
+  match_principal: string | null;
+  certificaciones: Array<{ 
+    nombre: string; 
+    institucion?: string;
+    fecha_emision?: string;
+    fecha_expiracion?: string;
+  }>;
+  skills: Array<{ 
+    nombre: string; 
+    categoria?: string;
+    proficiencia?: number;
+  }>;
+  lider: { nombre?: string; email?: string } | null;
+}
+
+export interface MCPRoleResult {
+  rol_id: string;
+  descripcion: string;
+  candidatos: MCPCandidate[];
+  total: number;
+}
+
+export interface SuggestedTeam {
+  generated_at: string | null;
+  mcp_available: boolean;
+  resultados: Record<string, MCPRoleResult>;
+  total_roles: number;
+  total_candidatos: number;
+  coverage_percent: number;
+  error?: string;
+}
+
+export interface TeamSuggestionResponse {
+  rfp_id: string;
+  scenario: Scenario;
+  team_estimation: TeamEstimation;
+  cost_estimation: CostEstimation;
+  suggested_team: SuggestedTeam | null;
+  message: string | null;
+}
+
+// ============ CERTIFICATIONS ============
+
+export interface Certification {
+  id: string;
+  name: string;
+  filename: string;
+  description: string | null;
+  location: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CertificationUploadResponse {
+  message: string;
+  id: string;
+}
+
+// ============ EXPERIENCE ============
+
+export interface Experience {
+  id: string;
+  descripcion_servicio: string;
+  propietario_servicio: string;
+  ubicacion: string;
+  fecha_inicio: string;
+  fecha_fin?: string;
+  monto_final?: number;
+  created_at: string;
 }

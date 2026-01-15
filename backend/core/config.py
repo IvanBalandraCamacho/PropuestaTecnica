@@ -25,15 +25,19 @@ class Settings(BaseSettings):
     )
     
     # GCP Settings
-    GCP_PROJECT_ID: str = Field(default="", description="Google Cloud Project ID")
+    GCP_PROJECT_ID: str = Field(default="squad-ia-latam", description="Google Cloud Project ID")
     GCP_LOCATION: str = Field(default="us-central1", description="GCP Region")
-    GCS_BUCKET: str = Field(default="", description="Cloud Storage bucket for RFP files")
+    GCS_BUCKET: str = Field(default="caso01-documents", description="Cloud Storage bucket for RFP files")
     
     # GCP Credentials (Service Account JSON path - for Cloud Storage)
-    GOOGLE_APPLICATION_CREDENTIALS: str = Field(
-        default="/app/gcp-credentials.json",
-        description="Path to GCP service account JSON file"
+    GOOGLE_APPLICATION_CREDENTIALS: str | None = Field(
+        default=None, 
+        description="Path to GCP service account JSON file (optional if using env vars)"
     )
+    
+    # GCP Credentials (Environment Variables)
+    GCP_CLIENT_EMAIL: str = Field(default="", description="GCP Service Account Email")
+    GCP_PRIVATE_KEY: str = Field(default="", description="GCP Private Key")
     
     # Google AI API Key (for Gemini)
     GOOGLE_API_KEY: str = Field(
@@ -44,7 +48,13 @@ class Settings(BaseSettings):
     # Gemini Settings
     GEMINI_MODEL: str = Field(
         default="gemini-3-pro-preview",
-        description="Gemini model to use (gemini-3-pro-preview, gemini-3-flash-preview, gemini-2.5-pro, gemini-2.5-flash)"
+        description="Gemini model to use (gemini-3-pro-preview es el más potente para análisis complejos)"
+    )
+    
+    # MCP Talent Search Server
+    MCP_TALENT_URL: str = Field(
+        default="http://localhost:8083",
+        description="URL of the MCP Talent Search Server"
     )
     
     # JWT Settings
@@ -65,6 +75,7 @@ class Settings(BaseSettings):
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = True
+        extra = "ignore"
 
 
 @lru_cache

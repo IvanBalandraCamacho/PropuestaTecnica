@@ -91,7 +91,9 @@ class RFPSubmission(Base):
     extracted_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     
     # Campos indexados para búsqueda/filtros
+    title: Mapped[str | None] = mapped_column(String(255), nullable=True)
     client_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    client_acronym: Mapped[str | None] = mapped_column(String(50), nullable=True)
     country: Mapped[str | None] = mapped_column(String(100), nullable=True)
     category: Mapped[str | None] = mapped_column(String(50), nullable=True)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -109,6 +111,7 @@ class RFPSubmission(Base):
     # Métricas de análisis
     confidence_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
     recommendation: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    recommended_isos: Mapped[list | None] = mapped_column(JSONB, nullable=True)
     
     # Decisión del BDM
     decision: Mapped[str | None] = mapped_column(String(10), nullable=True)  # go, no_go

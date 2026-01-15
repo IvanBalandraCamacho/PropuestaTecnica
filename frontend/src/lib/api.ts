@@ -13,6 +13,13 @@ import type {
   RFPQuestion,
   RFPDecision,
   UploadResponse,
+  TeamSuggestionResponse,
+  TeamEstimation,
+  CostEstimation,
+  SuggestedTeam,
+  Certification,
+  CertificationUploadResponse,
+  Experience,
 } from '../types';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/v1';
@@ -20,9 +27,6 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api/
 // Crear instancia de axios
 const api: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 // Interceptor para añadir token
@@ -132,12 +136,8 @@ export const rfpApi = {
   upload: async (file: File): Promise<UploadResponse> => {
     const formData = new FormData();
     formData.append('file', file);
-    
-    const { data } = await api.post<UploadResponse>('/rfp/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
+
+    const { data } = await api.post<UploadResponse>('/rfp/upload', formData);
     return data;
   },
 
@@ -158,6 +158,118 @@ export const rfpApi = {
 
   delete: async (id: string): Promise<void> => {
     await api.delete(`/rfp/${id}`);
+  },
+
+  /**
+   * Busca candidatos del equipo usando MCP Talent Search
+   * @param id - ID del RFP
+   * @param forceRefresh - Si es true, vuelve a consultar MCP aunque ya existan resultados
+   */
+  suggestTeam: async (id: string, forceRefresh?: boolean): Promise<TeamSuggestionResponse> => {
+    const params = forceRefresh ? { force_refresh: true } : {};
+    const { data } = await api.post<TeamSuggestionResponse>(`/rfp/${id}/suggest-team`, null, { params });
+    return data;
+  },
+
+  /**
+   * Obtiene la estimación de equipo y costos guardada para un RFP
+   */
+  getTeamEstimation: async (id: string): Promise<{
+    team_estimation: TeamEstimation | null;
+    cost_estimation: CostEstimation | null;
+    suggested_team: SuggestedTeam | null;
+  }> => {
+    const { data } = await api.get<{
+      team_estimation: TeamEstimation | null;
+      cost_estimation: CostEstimation | null;
+      suggested_team: SuggestedTeam | null;
+    }>(`/rfp/${id}/team-estimation`);
+    return data;
+  },
+};
+
+// ============ CERTIFICATIONS ============
+
+export const certificationsApi = {
+  list: async (): Promise<Certification[]> => {
+    const { data } = await api.get<Certification[]>('/certifications/');
+    return data;
+  },
+
+  upload: async (file: File): Promise<CertificationUploadResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    // Note: The backend endpoint is /certifications/save
+    const { data } = await api.post<CertificationUploadResponse>('/certifications/save', formData);
+    return data;
+  },
+};
+
+// ============ PROPOSAL GENERATION ============
+
+export const proposalApi = {
+  generate: async (rfpId: string, selectedCertIds: string[] = [], selectedExpIds: string[] = [], selectedChapIds: string[] = []) => {
+    const response = await api.post('/proposal/generate', { // CORRECTED URL to match backend router prefix
+      rfp_id: rfpId, // Ensure match with backend schema
+      certification_ids: selectedCertIds,
+      experience_ids: selectedExpIds,
+      chapter_ids: selectedChapIds
+    }, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
+};
+
+export const experiencesApi = {
+  list: async () => {
+    const response = await api.get<Experience[]>('/experiences/');
+    return response.data;
+  },
+  create: async (data: Omit<Experience, 'id' | 'created_at'>) => {
+    const response = await api.post<Experience>('/experiences/', data);
+    return response.data;
+  },
+  update: async (id: string, data: Partial<Experience>) => {
+    const response = await api.put<Experience>(`/experiences/${id}`, data);
+    return response.data;
+  },
+  delete: async (id: string) => {
+    await api.delete(`/experiences/${id}`);
+  },
+  getRecommendations: async (rfpId: string) => {
+    const response = await api.post<{ experience_id: string; score: number; reason: string }[]>('/experiences/recommendations', { rfp_id: rfpId });
+    return response.data;
+  },
+};
+
+
+export interface Chapter {
+  id: string;
+  name: string;
+  description: string;
+  filename: string;
+  location: string;
+  created_at: string;
+}
+
+export const chaptersApi = {
+  list: async (): Promise<Chapter[]> => {
+    const { data } = await api.get<Chapter[]>('/chapters/');
+    return data;
+  },
+
+  upload: async (file: File): Promise<{ message: string; id: string }> => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const { data } = await api.post<{ message: string; id: string }>('/chapters/save', formData);
+    return data;
+  },
+
+  getRecommendations: async (rfpId: string) => {
+    const { data } = await api.post<{ chapter_id: string; score: number; reason: string }[]>('/chapters/recommendations', { rfp_id: rfpId });
+    return data;
   },
 };
 

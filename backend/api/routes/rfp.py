@@ -16,6 +16,7 @@ from core.database import get_db
 from core.dependencies import get_current_user
 from core.storage import get_storage_service
 from core.services.analyzer import get_analyzer_service
+from core.services.mcp_client import get_mcp_client, convert_team_estimation_to_mcp_roles
 from models.rfp import RFPSubmission, RFPQuestion, RFPStatus
 from models.user import User
 from models.schemas import (
@@ -25,6 +26,8 @@ from models.schemas import (
     UploadResponse,
     RFPListResponse,
     RFPQuestion as RFPQuestionSchema,
+    TeamSuggestionRequest,
+    TeamSuggestionResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -97,6 +100,7 @@ async def upload_rfp(
             content, 
             filename,
             analysis_mode=analysis_mode,
+            db=db,
         )
         
         # Extraer campos indexados
@@ -109,6 +113,10 @@ async def upload_rfp(
         
         for field, value in indexed_fields.items():
             setattr(rfp, field, value)
+        
+        # Guardar recommended_isos en su columna específica
+        if "recommended_isos" in extracted_data:
+            rfp.recommended_isos = extracted_data["recommended_isos"]
         
         await db.commit()
         await db.refresh(rfp)
@@ -156,7 +164,7 @@ async def analyze_rfp_task(rfp_id: str, file_uri: str, file_content: bytes):
             
             # Analizar con Gemini
             analyzer = get_analyzer_service()
-            extracted_data = await analyzer.analyze_rfp_from_content(file_content, rfp.file_name)
+            extracted_data = await analyzer.analyze_rfp_from_content(file_content, rfp.file_name, db=db)
             
             # Extraer campos indexados
             indexed_fields = analyzer.extract_indexed_fields(extracted_data)
@@ -168,6 +176,10 @@ async def analyze_rfp_task(rfp_id: str, file_uri: str, file_content: bytes):
             
             for field, value in indexed_fields.items():
                 setattr(rfp, field, value)
+            
+            # Guardar recommended_isos en su columna específica
+            if "recommended_isos" in extracted_data:
+                rfp.recommended_isos = extracted_data["recommended_isos"]
             
             await db.commit()
             logger.info(f"RFP analysis completed: {rfp_id}")
@@ -502,3 +514,184 @@ async def get_storage_stats(
     """
     storage = get_storage_service()
     return storage.get_storage_stats()
+
+
+# ============ TEAM SUGGESTION ============
+
+@router.post("/{rfp_id}/suggest-team")
+async def suggest_team(
+    rfp_id: UUID,
+    request: TeamSuggestionRequest | None = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Sugiere equipo real basado en el análisis del RFP.
+    Conecta con MCP Talent Search para traer candidatos de TIVIT.
+    
+    El análisis incluye:
+    - team_estimation: Roles, skills, certificaciones requeridas
+    - cost_estimation: Costos estimados con tarifas de mercado (grounding)
+    - suggested_team: Candidatos reales de TIVIT
+    
+    Los 4 escenarios:
+    - A: Cliente define equipo + presupuesto -> Validar viabilidad
+    - B: Sin equipo + con presupuesto -> IA sugiere equipo
+    - C: Con equipo + sin presupuesto -> Estimar presupuesto
+    - D: Sin equipo + sin presupuesto -> IA sugiere todo
+    """
+    force_refresh = request.force_refresh if request else False
+    
+    # Obtener RFP
+    result = await db.execute(
+        select(RFPSubmission).where(RFPSubmission.id == rfp_id)
+    )
+    rfp = result.scalar_one_or_none()
+    
+    if not rfp:
+        raise HTTPException(status_code=404, detail="RFP no encontrado")
+    
+    if not rfp.extracted_data:
+        raise HTTPException(
+            status_code=400, 
+            detail="RFP no tiene datos de análisis. Debe analizarse primero."
+        )
+    
+    # Verificar si ya tiene team_estimation
+    team_estimation = rfp.extracted_data.get("team_estimation")
+    cost_estimation = rfp.extracted_data.get("cost_estimation")
+    suggested_team = rfp.extracted_data.get("suggested_team")
+    
+    if not team_estimation:
+        raise HTTPException(
+            status_code=400,
+            detail="RFP no tiene estimación de equipo. Vuelva a analizar el documento."
+        )
+    
+    # Si ya tiene suggested_team y no se fuerza refresh, retornarlo
+    if suggested_team and not force_refresh:
+        logger.info(f"Returning cached suggested team for RFP {rfp_id}")
+        return {
+            "rfp_id": rfp_id,
+            "scenario": team_estimation.get("scenario", "D"),
+            "team_estimation": team_estimation,
+            "cost_estimation": cost_estimation,
+            "suggested_team": suggested_team,
+            "message": "Equipo sugerido (cache)",
+        }
+    
+    # Obtener país del RFP
+    country = rfp.extracted_data.get("country") or rfp.country or "Chile"
+    
+    # Convertir team_estimation a formato MCP
+    mcp_roles = convert_team_estimation_to_mcp_roles(team_estimation, country)
+    
+    if not mcp_roles:
+        raise HTTPException(
+            status_code=400,
+            detail="No se encontraron roles en la estimación de equipo."
+        )
+    
+    logger.info(f"Searching candidates for {len(mcp_roles)} roles in {country}")
+    
+    # Verificar disponibilidad de MCP
+    mcp_client = get_mcp_client()
+    mcp_available = await mcp_client.health_check()
+    
+    if not mcp_available:
+        logger.warning("MCP server not available, returning estimation only")
+        return {
+            "rfp_id": rfp_id,
+            "scenario": team_estimation.get("scenario", "D"),
+            "team_estimation": team_estimation,
+            "cost_estimation": cost_estimation,
+            "suggested_team": {
+                "mcp_available": False,
+                "error": "MCP Talent Search no disponible",
+                "resultados": {},
+                "total_candidatos": 0,
+            },
+            "message": "MCP no disponible. Solo se muestra estimación.",
+        }
+    
+    # Llamar a MCP
+    try:
+        mcp_results = await mcp_client.search_team(mcp_roles)
+        
+        # Agregar metadata
+        mcp_results["generated_at"] = datetime.utcnow().isoformat()
+        mcp_results["mcp_available"] = True
+        
+        # Calcular cobertura
+        roles_with_candidates = sum(
+            1 for r in mcp_results.get("resultados", {}).values() 
+            if r.get("total", 0) > 0
+        )
+        total_roles = len(mcp_roles)
+        mcp_results["coverage_percent"] = (
+            (roles_with_candidates / total_roles * 100) if total_roles > 0 else 0
+        )
+        
+        # Guardar en extracted_data
+        rfp.extracted_data["suggested_team"] = mcp_results
+        rfp.updated_at = datetime.utcnow()
+        await db.commit()
+        
+        logger.info(
+            f"Found {mcp_results.get('total_candidatos', 0)} candidates "
+            f"for {total_roles} roles"
+        )
+        
+        return {
+            "rfp_id": rfp_id,
+            "scenario": team_estimation.get("scenario", "D"),
+            "team_estimation": team_estimation,
+            "cost_estimation": cost_estimation,
+            "suggested_team": mcp_results,
+            "message": f"Equipo sugerido con {mcp_results.get('total_candidatos', 0)} candidatos",
+        }
+        
+    except Exception as e:
+        logger.error(f"Error calling MCP: {e}")
+        return {
+            "rfp_id": rfp_id,
+            "scenario": team_estimation.get("scenario", "D"),
+            "team_estimation": team_estimation,
+            "cost_estimation": cost_estimation,
+            "suggested_team": {
+                "mcp_available": False,
+                "error": str(e),
+                "resultados": {},
+                "total_candidatos": 0,
+            },
+            "message": f"Error al buscar candidatos: {str(e)}",
+        }
+
+
+@router.get("/{rfp_id}/team-estimation")
+async def get_team_estimation(
+    rfp_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Obtiene la estimación de equipo, costos y candidatos sugeridos de un RFP.
+    No llama a MCP, solo retorna los datos guardados del análisis.
+    """
+    result = await db.execute(
+        select(RFPSubmission).where(RFPSubmission.id == rfp_id)
+    )
+    rfp = result.scalar_one_or_none()
+    
+    if not rfp:
+        raise HTTPException(status_code=404, detail="RFP no encontrado")
+    
+    if not rfp.extracted_data:
+        raise HTTPException(status_code=400, detail="RFP no tiene datos de análisis")
+    
+    return {
+        "rfp_id": rfp_id,
+        "team_estimation": rfp.extracted_data.get("team_estimation"),
+        "cost_estimation": rfp.extracted_data.get("cost_estimation"),
+        "suggested_team": rfp.extracted_data.get("suggested_team"),
+    }
