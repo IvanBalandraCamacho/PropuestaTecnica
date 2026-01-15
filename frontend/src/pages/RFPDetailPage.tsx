@@ -214,6 +214,14 @@ const RFPDetailPage: React.FC = () => {
     return Promise.resolve();
   };
 
+  // Formatear categoría a título (Ej: desarrollo_software -> Desarrollo Software)
+  const formatCategory = (category: string | null | undefined): string => {
+    if (!category) return '-';
+    return category
+      .replace(/_/g, ' ')
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  };
+
   if (isLoading) {
     return (
       <AppLayout>
@@ -288,7 +296,7 @@ const RFPDetailPage: React.FC = () => {
                       {rfp.country || '-'}
                     </Descriptions.Item>
                     <Descriptions.Item label="Categoría">
-                      {rfp.category?.replace(/_/g, ' ') || '-'}
+                      {formatCategory(rfp.category)}
                     </Descriptions.Item>
                     <Descriptions.Item label="TVT">
                       {rfp.tvt || '-'}
