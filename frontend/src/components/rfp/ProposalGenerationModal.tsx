@@ -774,11 +774,7 @@ const ProposalGenerationModal: React.FC<ProposalGenerationModalProps> = ({
                                 { title: 'Capítulos', description: 'Estructura' },
                             ]}
                             className="premium-steps-dark-mode"
-<<<<<<< HEAD
                             progressDot={(_dot, { status }) => (
-=======
-                            progressDot={(_, { status }) => (
->>>>>>> 7aee5b58ebf7be736d86053953845669e8c197dd
                                 <div style={{
                                     width: 10, height: 10, borderRadius: '50%',
                                     background: status === 'process' ? '#E31837' : (status === 'finish' ? '#434343' : '#262626'),

@@ -47,29 +47,6 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-<<<<<<< HEAD
-# CORS - En DEBUG permitir todos los orígenes
-if settings.DEBUG:
-    # Modo desarrollo: permitir todo
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=False,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        expose_headers=["*"],
-    )
-else:
-    # Modo producción: orígenes específicos
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.CORS_ORIGINS,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-        expose_headers=["*"],
-    )
-=======
 # CORS
 app.add_middleware(
     CORSMiddleware,
@@ -78,7 +55,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
->>>>>>> 7aee5b58ebf7be736d86053953845669e8c197dd
 
 # Registrar routers
 app.include_router(auth_router, prefix=settings.API_V1_PREFIX)
