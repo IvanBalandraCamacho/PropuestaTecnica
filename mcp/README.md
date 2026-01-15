@@ -18,6 +18,7 @@ Sistema de búsqueda semántica de talento para Team Building automatizado en li
 
 ---
 
+
 ## Ejecución con Docker (Recomendado)
 
 El servicio MCP está integrado en el `docker-compose.yml` principal:
