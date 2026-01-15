@@ -4,7 +4,7 @@ Sistema de búsqueda semántica de talento para Team Building automatizado en li
 
 > **Documentación técnica completa:** Ver [docs/docs.md](docs/docs.md)
 
-## Características Principales
+## Características Principales 
 
 | Feature | Descripción |
 |---------|-------------|
