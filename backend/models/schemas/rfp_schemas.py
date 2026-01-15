@@ -107,6 +107,7 @@ class RFPSummary(BaseModel):
     budget_min: float | None = None
     budget_max: float | None = None
     currency: str = "USD"
+    tvt: str | None = None
     proposal_deadline: date | None = None
     recommendation: str | None = None
     decision: str | None = None
@@ -129,6 +130,19 @@ class RFPDetail(RFPSummary):
     decided_at: datetime | None = None
     updated_at: datetime
     questions: list[RFPQuestion] = []
+
+
+class RFPUpdate(BaseModel):
+    """Schema para actualizar campos editables del RFP."""
+    client_name: str | None = None
+    country: str | None = None
+    category: str | None = None
+    budget_min: float | None = None
+    budget_max: float | None = None
+    currency: str | None = None
+    tvt: str | None = None
+    proposal_deadline: date | None = None
+    project_duration: str | None = None
 
 
 # ============ DASHBOARD SCHEMAS ============

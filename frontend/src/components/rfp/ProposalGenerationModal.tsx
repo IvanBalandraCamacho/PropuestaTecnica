@@ -731,10 +731,10 @@ const ProposalGenerationModal: React.FC<ProposalGenerationModalProps> = ({
                 width={1000}
                 centered
                 footer={null}
-                styles={{ body: { padding: 0 }, content: { borderRadius: '16px', overflow: 'hidden' } }}
+                styles={{ body: { padding: 0 } }}
                 closeIcon={null}
                 className="premium-wizard-dark-red"
-                style={{ maxWidth: '95vw', top: 20, paddingBottom: 20 }}
+                style={{ maxWidth: '95vw', top: 20, paddingBottom: 20, borderRadius: '16px', overflow: 'hidden' }}
             >
                 <div style={{ display: 'flex', height: '80vh', maxHeight: '700px', overflow: 'hidden', background: '#141414' }}>
                     {/* SIDEBAR: Gradient Deep Dark RED */}
@@ -774,7 +774,7 @@ const ProposalGenerationModal: React.FC<ProposalGenerationModalProps> = ({
                                 { title: 'Capítulos', description: 'Estructura' },
                             ]}
                             className="premium-steps-dark-mode"
-                            progressDot={(dot, { status }) => (
+                            progressDot={(_dot, { status }) => (
                                 <div style={{
                                     width: 10, height: 10, borderRadius: '50%',
                                     background: status === 'process' ? '#E31837' : (status === 'finish' ? '#434343' : '#262626'),

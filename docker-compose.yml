@@ -55,13 +55,13 @@ services:
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-3-pro-preview}
 
       # MCP Talent Search
-      MCP_TALENT_URL: http://mcp:8080
+      MCP_TALENT_URL: https://mcp-tivit.eastus2.cloudapp.azure.com
 
       # JWT
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-super-secret-key-change-in-production}
 
       # CORS
-      CORS_ORIGINS: '["http://localhost:3000", "http://localhost:5173", "http://frontend:80"]'
+      CORS_ORIGINS: http://localhost:3000,http://localhost:5173,http://frontend:80,http://127.0.0.1:5173,http://127.0.0.1:3000
     volumes:
       - ./backend:/app
       - ./gcp-credentials.json:/app/gcp-credentials.json:ro

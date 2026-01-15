@@ -103,6 +103,9 @@ class RFPSubmission(Base):
     budget_max: Mapped[float | None] = mapped_column(Numeric(15, 2), nullable=True)
     currency: Mapped[str | None] = mapped_column(String(20), nullable=True, default="USD")
     
+    # Campo TVT (identificador interno, puede iniciar con 0)
+    tvt: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    
     # Fechas
     proposal_deadline: Mapped[datetime | None] = mapped_column(Date, nullable=True)
     questions_deadline: Mapped[datetime | None] = mapped_column(Date, nullable=True)

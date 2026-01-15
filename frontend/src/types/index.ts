@@ -61,6 +61,7 @@ export interface RFPSummary {
   budget_min: number | null;
   budget_max: number | null;
   currency: string;
+  tvt: string | null;
   proposal_deadline: string | null;
   recommendation: Recommendation | null;
   decision: 'go' | 'no_go' | null;
