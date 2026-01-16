@@ -9,6 +9,7 @@ import {
     InboxOutlined,
     FileWordOutlined,
     CheckCircleOutlined,
+    DeleteOutlined,
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { certificationsApi } from '../lib/api';
@@ -36,7 +37,30 @@ const CertificationsPage: React.FC = () => {
         // Eliminamos onSuccess global para manejarlo por archivo o al final
     });
 
-    const handleUpload = async () => {
+    // Mutation to delete cert
+    const deleteMutation = useMutation({
+        mutationFn: certificationsApi.delete,
+        onSuccess: () => {
+            message.success('Certificación eliminada');
+            queryClient.invalidateQueries({ queryKey: ['certifications'] });
+        },
+        onError: () => {
+            message.error('Error al eliminar certificación');
+        }
+    });
+
+    const handleDelete = (id: string) => {
+        Modal.confirm({
+            title: '¿Eliminar certificación?',
+            content: 'Esta acción no se puede deshacer.',
+            okText: 'Eliminar',
+            okType: 'danger',
+            cancelText: 'Cancelar',
+            onOk: () => deleteMutation.mutate(id)
+        });
+    };
+
+    const handleUpload = async () => { // Kept original signature, diff's signature was partial/incorrect
         if (fileList.length === 0) return;
 
         try {
@@ -226,6 +250,16 @@ const CertificationsPage: React.FC = () => {
                                         >
                                             {cert.description || 'Sin descripción disponible.'}
                                         </Paragraph>
+
+                                    </div>
+
+                                    <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'flex-end', paddingBottom: 16 }}>
+                                        <Button
+                                            type="text"
+                                            danger
+                                            icon={<DeleteOutlined />}
+                                            onClick={() => handleDelete(cert.id)}
+                                        />
                                     </div>
 
                                     <div style={{
@@ -374,7 +408,7 @@ const CertificationsPage: React.FC = () => {
                     </Space>
                 </div>
             </Modal>
-        </AppLayout>
+        </AppLayout >
     );
 };
 

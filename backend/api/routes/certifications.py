@@ -82,3 +82,24 @@ async def create_certification(
     await db.refresh(cert)
     
     return {"message": "Certificación cargada exitosamente", "id": cert.id}
+
+@router.delete("/{cert_id}")
+async def delete_certification(cert_id: UUID, db: AsyncSession = Depends(get_db)):
+    """Eliminar una certificación por ID."""
+    result = await db.execute(select(Certification).where(Certification.id == cert_id))
+    cert = result.scalar_one_or_none()
+    
+    if not cert:
+        raise HTTPException(status_code=404, detail="Certificación no encontrada")
+    
+    # Optional: Delete file from storage if needed
+    # storage = get_storage_service()
+    # storage.delete_file(cert.location) 
+    
+    # Soft delete or hard delete? Let's do hard delete for now or just mark inactive
+    # Assuming hard delete for simplicity based on request
+    from sqlalchemy import delete
+    await db.execute(delete(Certification).where(Certification.id == cert_id))
+    await db.commit()
+    
+    return {"message": "Certificación eliminada exitosamente"}
