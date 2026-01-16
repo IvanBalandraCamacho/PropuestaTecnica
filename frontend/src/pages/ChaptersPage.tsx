@@ -10,6 +10,7 @@ import {
     FileWordOutlined,
     ReadOutlined,
     DeleteOutlined,
+    DownloadOutlined,
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { chaptersApi } from '../lib/api';
@@ -70,6 +71,24 @@ const ChaptersPage: React.FC = () => {
             cancelText: 'Cancelar',
             onOk: () => deleteMutation.mutate(id)
         });
+    };
+
+    const handleDownload = async (id: string, filename: string) => {
+        try {
+            message.loading({ content: 'Descargando...', key: 'download' });
+            const blob = await chaptersApi.download(id);
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            message.success({ content: 'Descarga completa', key: 'download' });
+        } catch (error) {
+            console.error('Download error:', error);
+            message.error({ content: 'Error al descargar archivo', key: 'download' });
+        }
     };
 
     const handleUpload = async () => { // Changed signature back to original as per faithful edit rule
@@ -244,6 +263,12 @@ const ChaptersPage: React.FC = () => {
                                     </Paragraph>
 
                                     <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'flex-end' }}>
+                                        <Button
+                                            type="text"
+                                            icon={<DownloadOutlined />}
+                                            onClick={() => handleDownload(item.id, item.filename)}
+                                            style={{ marginRight: 8 }}
+                                        />
                                         <Button
                                             type="text"
                                             danger
