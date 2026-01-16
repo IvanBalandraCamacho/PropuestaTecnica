@@ -10,6 +10,7 @@ import {
     FileWordOutlined,
     CheckCircleOutlined,
     DeleteOutlined,
+    DownloadOutlined,
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { certificationsApi } from '../lib/api';
@@ -58,6 +59,24 @@ const CertificationsPage: React.FC = () => {
             cancelText: 'Cancelar',
             onOk: () => deleteMutation.mutate(id)
         });
+    };
+
+    const handleDownload = async (id: string, filename: string) => {
+        try {
+            message.loading({ content: 'Descargando...', key: 'download' });
+            const blob = await certificationsApi.download(id);
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            message.success({ content: 'Descarga completa', key: 'download' });
+        } catch (error) {
+            console.error('Download error:', error);
+            message.error({ content: 'Error al descargar archivo', key: 'download' });
+        }
     };
 
     const handleUpload = async () => { // Kept original signature, diff's signature was partial/incorrect
@@ -254,6 +273,12 @@ const CertificationsPage: React.FC = () => {
                                     </div>
 
                                     <div style={{ marginTop: 'auto', display: 'flex', justifyContent: 'flex-end', paddingBottom: 16 }}>
+                                        <Button
+                                            type="text"
+                                            icon={<DownloadOutlined />}
+                                            onClick={() => handleDownload(cert.id, cert.filename)}
+                                            style={{ marginRight: 8 }}
+                                        />
                                         <Button
                                             type="text"
                                             danger

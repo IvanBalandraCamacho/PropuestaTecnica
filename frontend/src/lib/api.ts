@@ -214,6 +214,13 @@ export const certificationsApi = {
   delete: async (id: string): Promise<void> => {
     await api.delete(`/certifications/${id}`);
   },
+
+  download: async (id: string): Promise<Blob> => {
+    const response = await api.get(`/certifications/${id}/download`, {
+      responseType: 'blob',
+    });
+    return response.data;
+  },
 };
 
 // ============ PROPOSAL GENERATION ============
@@ -279,6 +286,13 @@ export const chaptersApi = {
 
   delete: async (id: string): Promise<void> => {
     await api.delete(`/chapters/${id}`);
+  },
+
+  download: async (id: string): Promise<Blob> => {
+    const response = await api.get(`/chapters/${id}/download`, {
+      responseType: 'blob',
+    });
+    return response.data;
   },
 
   getRecommendations: async (rfpId: string) => {

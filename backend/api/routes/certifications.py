@@ -2,6 +2,7 @@
 Endpoints para certificaciones.
 """
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from uuid import UUID
@@ -103,3 +104,28 @@ async def delete_certification(cert_id: UUID, db: AsyncSession = Depends(get_db)
     await db.commit()
     
     return {"message": "Certificación eliminada exitosamente"}
+
+@router.get("/{cert_id}/download")
+async def download_certification(cert_id: UUID, db: AsyncSession = Depends(get_db)):
+    """Descargar una certificación."""
+    result = await db.execute(select(Certification).where(Certification.id == cert_id))
+    cert = result.scalar_one_or_none()
+    
+    if not cert:
+        raise HTTPException(status_code=404, detail="Certificación no encontrada")
+    
+    storage = get_storage_service()
+    try:
+        file_content = storage.download_file(cert.location)
+        
+        # Determine content type (default to octet-stream if unknown)
+        content_type = "application/vnd.openxmlformats-officedocument.wordprocessingml.document" if cert.filename.endswith(".docx") else "application/octet-stream"
+        
+        from io import BytesIO
+        return StreamingResponse(
+            BytesIO(file_content), 
+            media_type=content_type, 
+            headers={"Content-Disposition": f"attachment; filename={cert.filename}"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error descargando archivo: {str(e)}")
