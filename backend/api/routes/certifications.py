@@ -47,6 +47,14 @@ async def create_certification(
     analyzer = get_analyzer_service()
     extracted_data = await analyzer.analyze_certification_content(content, file.filename)
     
+    # 2.1 Validar si es una certificación válida
+    if extracted_data.get("is_valid_certification") is False:
+        reason = extracted_data.get("validation_reason", "El documento no parece ser una certificación válida.")
+        raise HTTPException(
+            status_code=400,
+            detail=f"Documento rechazado: {reason}"
+        )
+    
     # 3. Guardar archivo físico
     storage = get_storage_service()
     # Reset del cursor del archivo para subirlo

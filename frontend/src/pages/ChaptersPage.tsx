@@ -200,21 +200,7 @@ const ChaptersPage: React.FC = () => {
                                     bodyStyle={{ padding: 24, display: 'flex', flexDirection: 'column', height: '100%' }}
                                 >
                                     <div style={{ display: 'flex', alignItems: 'flex-start', marginBottom: 20 }}>
-                                        <div style={{
-                                            minWidth: 56,
-                                            height: 56,
-                                            borderRadius: 16,
-                                            background: 'linear-gradient(135deg, rgba(227, 24, 55, 0.1) 0%, rgba(227, 24, 55, 0.05) 100%)',
-                                            display: 'flex',
-                                            alignItems: 'center',
-                                            justifyContent: 'center',
-                                            marginRight: 16,
-                                            color: '#E31837',
-                                            fontSize: 28,
-                                            border: '1px solid rgba(227, 24, 55, 0.2)'
-                                        }}>
-                                            <ReadOutlined />
-                                        </div>
+
                                         <div style={{ overflow: 'hidden' }}>
                                             <Text strong style={{ fontSize: 16, display: 'block', lineHeight: 1.3, marginBottom: 4 }} ellipsis>
                                                 {item.name || item.filename}
