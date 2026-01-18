@@ -97,6 +97,7 @@ class RFPSubmission(Base):
     country: Mapped[str | None] = mapped_column(String(100), nullable=True)
     category: Mapped[str | None] = mapped_column(String(50), nullable=True)
     summary: Mapped[str | None] = mapped_column(Text, nullable=True)
+    tvt: Mapped[str | None] = mapped_column(String(255), nullable=True)
     
     # Presupuesto
     budget_min: Mapped[float | None] = mapped_column(Numeric(15, 2), nullable=True)

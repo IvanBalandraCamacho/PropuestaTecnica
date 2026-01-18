@@ -91,6 +91,7 @@ async def generate_proposal(
         # 1. Obtener el contexto (datos)
         context_data = generator.prepare_context(
             rfp_data, 
+            rfp,
             user_name=user.full_name,
             certification_locations=list(cert_locations),
             experiences=experiences,
