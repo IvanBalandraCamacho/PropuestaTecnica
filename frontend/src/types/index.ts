@@ -58,6 +58,7 @@ export interface RFPSummary {
   country: string | null;
   category: RFPCategory | null;
   summary: string | null;
+  tvt: string | null;  // Solo números, pero string para permitir 0s iniciales
   budget_min: number | null;
   budget_max: number | null;
   currency: string;
@@ -164,6 +165,18 @@ export interface RFPListResponse {
 export interface RFPDecision {
   decision: 'go' | 'no_go';
   reason?: string;
+}
+
+export interface RFPUpdate {
+  client_name?: string | null;
+  country?: string | null;
+  category?: string | null;
+  tvt?: string | null;
+  budget_min?: number | null;
+  budget_max?: number | null;
+  currency?: string | null;
+  proposal_deadline?: string | null;
+  project_duration?: string | null;
 }
 
 export interface UploadResponse {

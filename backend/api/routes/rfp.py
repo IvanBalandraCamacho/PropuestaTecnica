@@ -23,6 +23,7 @@ from models.schemas import (
     RFPSummary,
     RFPDetail,
     RFPDecision,
+    RFPUpdate,
     UploadResponse,
     RFPListResponse,
     RFPQuestion as RFPQuestionSchema,
@@ -307,6 +308,55 @@ async def get_rfp(
     
     if not rfp:
         raise HTTPException(status_code=404, detail="RFP no encontrado")
+    
+    return RFPDetail.model_validate(rfp)
+
+
+# ============ UPDATE ============
+
+@router.patch("/{rfp_id}", response_model=RFPDetail)
+async def update_rfp(
+    rfp_id: UUID,
+    update_data: RFPUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Actualiza campos editables de un RFP.
+    Campos actualizables: client_name, country, category, tvt, budget_min, budget_max, 
+    currency, proposal_deadline, project_duration.
+    NO se puede actualizar: summary (generado por IA).
+    """
+    result = await db.execute(
+        select(RFPSubmission)
+        .options(selectinload(RFPSubmission.questions))
+        .where(RFPSubmission.id == rfp_id)
+    )
+    rfp = result.scalar_one_or_none()
+    
+    if not rfp:
+        raise HTTPException(status_code=404, detail="RFP no encontrado")
+    
+    # Validar TVT: solo números
+    if update_data.tvt is not None:
+        if update_data.tvt != "" and not update_data.tvt.isdigit():
+            raise HTTPException(
+                status_code=400, 
+                detail="El campo TVT solo puede contener números"
+            )
+    
+    # Actualizar solo los campos que vienen en el request
+    update_dict = update_data.model_dump(exclude_unset=True)
+    
+    for field, value in update_dict.items():
+        setattr(rfp, field, value)
+    
+    rfp.updated_at = datetime.utcnow()
+    
+    await db.commit()
+    await db.refresh(rfp)
+    
+    logger.info(f"RFP {rfp_id} updated: {list(update_dict.keys())}")
     
     return RFPDetail.model_validate(rfp)
 

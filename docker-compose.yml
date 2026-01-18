@@ -36,7 +36,7 @@ services:
     container_name: rfp_backend
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8000:8080"
     environment:
       # Database (Supabase Cloud)
       DATABASE_URL: ${DATABASE_URL}
@@ -60,14 +60,14 @@ services:
       # JWT
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-super-secret-key-change-in-production}
 
-      # CORS
-      CORS_ORIGINS: '["http://localhost:3000", "http://localhost:5173", "http://frontend:80"]'
+      # CORS - Lista separada por comas
+      CORS_ORIGINS: "http://localhost:3000,http://localhost:5173,http://frontend:80"
     volumes:
       - ./backend:/app
       - ./gcp-credentials.json:/app/gcp-credentials.json:ro
       - rfp_uploads:/app/uploads
     healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      test: [ "CMD", "curl", "-f", "http://localhost:8080/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -86,7 +86,7 @@ services:
     container_name: rfp_frontend
     restart: unless-stopped
     ports:
-      - "5173:80"
+      - "5173:8080"
     depends_on:
       - backend
     networks:
