@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     
     # MCP Talent Search Server
     MCP_TALENT_URL: str = Field(
-        default="http://localhost:8083",
+        default="https://mcp-tivit.eastus2.cloudapp.azure.com",
         description="URL of the MCP Talent Search Server"
     )
     
