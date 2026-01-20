@@ -238,24 +238,131 @@ class RFPAnalyzerService:
         content: bytes, 
         filename: str,
         analysis_mode: Literal["fast", "balanced", "deep"] = "balanced",
-        use_grounding: bool = True,
+        use_grounding: bool = False,  # Disabled by default - produces unrealistic salaries
         db: AsyncSession | None = None,
     ) -> dict[str, Any]:
         """
         Analiza un RFP desde su contenido en bytes.
         
+        ESTRATEGIA:
+        - PDFs: Siempre usa método binario (mejor para tablas visuales, OCR automático)
+        - DOCX: Usa extracción de texto
+        - Grounding: Deshabilitado por defecto (produce tarifas irreales de USA/Europa)
+        
         Args:
             content: Contenido del archivo en bytes
             filename: Nombre del archivo (para determinar tipo)
             analysis_mode: Modo de análisis (fast/balanced/deep)
-            use_grounding: Si True, usa Google Search para tarifas de mercado
+            use_grounding: DEPRECATED - Producía tarifas 3x más altas que realidad LATAM
             db: Sesión de base de datos para obtener certificaciones
             
         Returns:
             Datos extraídos del RFP incluyendo team_estimation y cost_estimation
         """
         logger.info(f"Starting RFP analysis for: {filename}")
-        logger.info(f"Analysis mode: {analysis_mode}, Grounding: {use_grounding}")
+        logger.info(f"Analysis mode: {analysis_mode}")
+        
+        # Detectar tipo de archivo y usar estrategia apropiada
+        filename_lower = filename.lower()
+        
+        # PDFs SIEMPRE usan método binario (mejor análisis de tablas)
+        if filename_lower.endswith('.pdf'):
+            logger.info("PDF detected - using BINARY method for better table recognition and OCR")
+            return await self._analyze_pdf_binary(
+                content, filename, analysis_mode, db
+            )
+        
+        # DOCX y otros usan extracción de texto
+        else:
+            logger.info(f"{filename.split('.')[-1].upper()} detected - using TEXT extraction method")
+            return await self._analyze_with_text_extraction(
+                content, filename, analysis_mode, False, db  # Grounding always False
+            )
+    
+    async def _analyze_pdf_binary(
+        self,
+        pdf_bytes: bytes,
+        filename: str,
+        analysis_mode: str,
+        db: AsyncSession | None,
+    ) -> dict[str, Any]:
+        """
+        Analiza PDF usando método binario (OCR de Gemini).
+        Mantiene tablas, gráficos y layout visual intacto.
+        """
+        logger.info("Using PDF binary analysis method")
+        
+        # Preparar prompt con certificaciones
+        prompt_to_use = self.analysis_prompt
+        
+        if db:
+            try:
+                result = await db.execute(
+                    select(Certification).where(Certification.is_active == True)
+                )
+                certs = result.scalars().all()
+                if certs:
+                    cert_list_str = "\n".join([
+                        f"- {c.name} (ID: {c.id}): {c.description[:100]}..."
+                        for c in certs
+                    ])
+                    prompt_to_use = prompt_to_use.replace(
+                        "{{available_certifications}}", cert_list_str
+                    )
+                    logger.info(f"Injected {len(certs)} certifications into prompt")
+                else:
+                    prompt_to_use = prompt_to_use.replace(
+                        "{{available_certifications}}", 
+                        "No hay certificaciones disponibles."
+                    )
+            except Exception as e:
+                logger.error(f"Error fetching certifications: {e}")
+                prompt_to_use = prompt_to_use.replace(
+                    "{{available_certifications}}", 
+                    "Error al recuperar certificaciones."
+                )
+        else:
+            prompt_to_use = prompt_to_use.replace(
+                "{{available_certifications}}", 
+                "No disponible (sin conexión a DB)."
+            )
+        
+        # Obtener configuración del modo
+        from core.gcp.gemini_client import ANALYSIS_MODES
+        mode_config = ANALYSIS_MODES.get(analysis_mode, ANALYSIS_MODES["balanced"])
+        
+        # Llamar al método de Gemini para PDFs binarios
+        result = await self.gemini.analyze_pdf_bytes(
+            pdf_bytes=pdf_bytes,
+            prompt=prompt_to_use,
+            temperature=mode_config["temperature"],
+            max_output_tokens=mode_config["max_output_tokens"],
+        )
+        
+        # Validar formato de respuesta
+        if isinstance(result, list):
+            if len(result) > 0 and isinstance(result[0], dict):
+                logger.warning("Gemini returned a list instead of a dict. Using first item.")
+                result = result[0]
+            else:
+                logger.error(f"Gemini returned unexpected list format: {result}")
+                result = {"error": "Invalid response format from AI", "raw": result}
+        
+        logger.info(f"Binary PDF analysis completed: {result.get('title', 'Unknown')}")
+        return result
+    
+    async def _analyze_with_text_extraction(
+        self,
+        content: bytes,
+        filename: str,
+        analysis_mode: str,
+        use_grounding: bool,
+        db: AsyncSession | None,
+    ) -> dict[str, Any]:
+        """
+        Análisis con extracción de texto (para DOCX u otros formatos no-PDF).
+        """
+        logger.info("Using text extraction method")
         
         # Extraer texto del documento
         document_text = self.extract_text(content, filename)
@@ -266,12 +373,11 @@ class RFPAnalyzerService:
         
         logger.info(f"Extracted {len(document_text)} characters from document")
         
-        # Preparar prompt con certificaciones si hay DB
+        # Preparar prompt con certificaciones
         prompt_to_use = self.analysis_prompt
         
         if db:
             try:
-                # Obtener certificaciones activas
                 result = await db.execute(select(Certification).where(Certification.is_active == True))
                 certs = result.scalars().all()
                 if certs:
@@ -286,23 +392,29 @@ class RFPAnalyzerService:
         else:
             prompt_to_use = prompt_to_use.replace("{{available_certifications}}", "No disponible (sin conexión a DB).")
 
-        # Analizar con Gemini - usar grounding si está habilitado
+        # Grounding disabled - produces unrealistic USA/Europe salaries
         if use_grounding:
-            logger.info("Using Gemini with Google Search Grounding for market rates")
-            result = await self.gemini.analyze_with_grounding(
-                document_content=document_text,
-                prompt=prompt_to_use,
-                temperature=0.1,
-                max_output_tokens=16384,
-            )
-        else:
-            result = await self.gemini.analyze_document(
-                document_content=document_text,
-                prompt=prompt_to_use,
-                analysis_mode=analysis_mode,
+            logger.warning(
+                "Grounding was requested but is DISABLED (produces 2-3x higher salaries than LATAM reality). "
+                "Using standard analysis with AI knowledge base."
             )
         
-        logger.info(f"RFP analysis completed: {result}")
+        # Siempre usar análisis estándar (sin grounding)
+        result = await self.gemini.analyze_document(
+            document_content=document_text,
+            prompt=prompt_to_use,
+            analysis_mode=analysis_mode,
+        )
+        
+        if isinstance(result, list):
+            if len(result) > 0 and isinstance(result[0], dict):
+                 logger.warning("Gemini returned a list instead of a dict. Using first item.")
+                 result = result[0]
+            else:
+                 logger.error(f"Gemini returned unexpected list format: {result}")
+                 result = {"error": "Invalid response format from AI", "raw": result}
+        
+        logger.info(f"Text extraction analysis completed: {result.get('title', 'Unknown Title')}")
         return result
     
     async def analyze_rfp(self, gcs_uri: str, use_grounding: bool = True, db: AsyncSession | None = None) -> dict[str, Any]:
@@ -492,6 +604,7 @@ class RFPAnalyzerService:
 
         except Exception as e:
             logger.error(f"Error in analyze_experience_relevance: {e}")
+            logger.error(f"Stack trace:", exc_info=True)
             return []
 
     async def analyze_chapter_relevance(

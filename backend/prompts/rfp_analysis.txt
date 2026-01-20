@@ -18,52 +18,80 @@ Primero, determina cual de los 4 escenarios aplica:
 - **Escenario D**: El RFP NO menciona equipo/personal Y NO menciona presupuesto
   -> Sugerir equipo Y estimar presupuesto
 
-## PASO 2: BUSCAR TARIFAS DE MERCADO (GROUNDING)
+## PASO 2: ESTIMAR TARIFAS DE MERCADO
 
-IMPORTANTE: USA GOOGLE SEARCH para obtener tarifas de mercado actuales.
+Usa tu conocimiento del mercado laboral para estimar tarifas REALISTAS en LATINOAMERICA.
 
-Para CADA ROL que identifiques, busca:
-- "salario [rol] [pais] 2026 USD mensual"
-- "software engineer salary [pais] monthly usd"
-- "[rol] rate [pais] usd"
+IMPORTANTE - Contexto Regional:
+- Este análisis es para LATINOAMERICA, NO Estados Unidos o Europa
+- Los salarios en LATAM son SIGNIFICATIVAMENTE menores (típicamente 40-70% menos que USA)
+- Considera el país específico del RFP para ajustar estimaciones
+- Usa USD como moneda estándar para facilitar comparaciones
 
-Ejemplos de busquedas:
-- "salario desarrollador java senior chile usd mensual"
-- "project manager IT salary peru monthly"
-- "devops engineer rate colombia usd"
+Guías Generales para Estimación:
+1. **Contexto Geográfico**: Considera economía del país
+   - Tier Alto: Chile, Brasil, México (salarios ~15-25% más altos)
+   - Tier Medio: Colombia, Perú (salarios promedio regional)
+   - Tier Variable: Argentina (considera fluctuación económica)
 
-## PASO 3: CALCULAR Y ANALIZAR
+2. **Diferencias por Seniority**:
+   - Junior: 40-60% del salario de un Senior
+   - Mid-level: 65-80% del salario de un Senior
+   - Senior: Referencia base
+   - Lead/Architect: 130-160% del salario de un Senior
 
-Segun el escenario:
+3. **Especialización**:
+   - Roles especializados (ML, Cloud Architect, Security): +20-30%
+   - Tecnologías modernas (React, AWS, Kubernetes): +10-15%
+   - Stack legacy o común: Salario base
 
-**Escenario A (Validar):**
+4. **Principio de Realismo**:
+   - Sé CONSERVADOR en tus estimaciones
+   - Es mejor subestimar ligeramente que sobrestimar
+   - Recuerda: estamos en LATAM, no USA/Europa
+
+NO inventes números arbitrarios. Usa tu conocimiento actualizado del mercado laboral LATAM.
+
+## PASO 3: ANALIZAR EQUIPO Y COSTOS
+
+Según el escenario detectado:
+
+**Escenario A (Cliente define equipo + presupuesto - Validar viabilidad):**
 1. Tomar el equipo que pide el cliente
-2. Buscar tarifas de mercado para cada rol
+2. Estimar tarifas de mercado para cada rol (basado en país, seniority, especialización)
 3. Calcular costo total mensual
 4. Comparar con presupuesto del cliente
 5. Determinar si es VIABLE o INSUFICIENTE
+6. Proporcionar recomendaciones si hay desajuste
 
-**Escenario B (Sugerir equipo):**
-1. Analizar alcance del proyecto
-2. Proponer equipo optimo (roles, cantidad, seniority)
-3. Buscar tarifas de mercado
-4. Verificar que quepa en presupuesto
-5. Ajustar si es necesario
+**Escenario B (Sin equipo + con presupuesto - Sugerir equipo óptimo):**
+1. Analizar alcance y complejidad del proyecto
+2. Proponer equipo óptimo (roles, cantidad, seniority)
+3. Estimar tarifas de mercado para cada rol
+4. Calcular costo total y verificar que quepa en presupuesto
+5. Ajustar equipo si es necesario (reducir seniority o cantidad)
+6. Justificar la propuesta
 
-**Escenario C (Estimar presupuesto):**
+**Escenario C (Con equipo + sin presupuesto - Estimar presupuesto necesario):**
 1. Tomar el equipo que pide el cliente
-2. Buscar tarifas de mercado
-3. Calcular costo base
-4. Agregar margen operativo (20%)
-5. Proponer presupuesto
+2. Estimar tarifas de mercado para cada rol
+3. Calcular costo base mensual
+4. Agregar margen operativo (20% para costos indirectos)
+5. Proponer presupuesto mensual y total
+6. Calcular duración total del proyecto
 
-**Escenario D (Sugerir todo):**
-1. Analizar alcance del proyecto
-2. Proponer equipo optimo
-3. Buscar tarifas de mercado
-4. Calcular costo base
+**Escenario D (Sin equipo + sin presupuesto - Sugerir equipo y presupuesto):**
+1. Analizar alcance, complejidad y duración del proyecto
+2. Proponer equipo óptimo basado en necesidades
+3. Estimar tarifas de mercado para cada rol
+4. Calcular costo base mensual
 5. Agregar margen operativo (20%)
-6. Proponer presupuesto
+6. Proponer presupuesto mensual y total del proyecto
+
+Para CADA rol en team_estimation, incluye en market_rate:
+- min, max, average: Rangos estimados para el país específico
+- source: "AI estimation based on LATAM market knowledge"
+- Justificación: Breve explicación del rango (país, seniority, tecnologías)
 
 ## PASO 4: CERTIFICACIONES RECOMENDADAS
 
@@ -215,6 +243,53 @@ Responde SOLO con un JSON valido (sin markdown, sin explicaciones) con este form
 9. Montos sin simbolos de moneda, solo numeros
 10. SIEMPRE busca tarifas actuales con Google Search (grounding)
 11. Responde SOLO con JSON, sin markdown ni explicaciones
+
+## DETECCION DE FECHAS Y TIMELINE (MUY IMPORTANTE)
+
+Los RFPs contienen MULTIPLES fechas. Debes identificar CADA UNA correctamente:
+
+**proposal_deadline (Fecha límite de entrega de propuesta):**
+- Es la fecha LIMITE para PRESENTAR/ENTREGAR la propuesta comercial/técnica
+- Busca frases como: "fecha de entrega", "plazo de presentación", "deadline propuesta", 
+  "enviar propuesta antes de", "recepción de ofertas", "cierre de licitación",
+  "fecha máxima de entrega", "vencimiento del plazo"
+- NO confundir con: fecha de inicio del proyecto, fecha de publicación, fecha de consultas
+
+**questions_deadline (Fecha límite para preguntas):**
+- Es la fecha hasta la cual se pueden hacer CONSULTAS o ACLARACIONES
+- Busca frases como: "fecha de consultas", "período de preguntas", "aclaraciones hasta",
+  "dudas antes de", "ronda de preguntas", "plazo para consultas"
+- Generalmente es ANTERIOR a proposal_deadline
+
+**project_duration (Duración del proyecto):**
+- Es el TIEMPO TOTAL del proyecto/contrato, NO una fecha
+- Busca frases como: "duración del contrato", "plazo de ejecución", "vigencia",
+  "período de X meses", "contrato por X años", "tiempo de implementación"
+- Expresar como: "X meses" o "X años"
+- Si hay fecha de inicio y fin, CALCULAR la diferencia
+
+**Errores comunes a EVITAR:**
+1. NO usar la primera fecha que encuentres como proposal_deadline
+2. NO confundir fecha de PUBLICACIÓN del RFP con fecha de ENTREGA
+3. NO confundir fecha de INICIO del proyecto con fecha de ENTREGA de propuesta
+4. NO confundir fecha de VIGENCIA del contrato con fecha de ENTREGA
+5. Si una fecha dice "publicado el..." o "emitido el...", es fecha de PUBLICACIÓN, NO de entrega
+6. Si una fecha dice "inicio de actividades..." o "comienzo del proyecto...", es fecha de INICIO, NO de entrega
+
+**Ejemplo de análisis correcto:**
+```
+Texto RFP: "Publicado: 15 enero 2026. Consultas hasta: 25 enero 2026. 
+           Entrega de propuestas: 5 febrero 2026. Inicio proyecto: 1 marzo 2026.
+           Duración contrato: 18 meses."
+
+Resultado:
+- proposal_deadline: "2026-02-05" (fecha de ENTREGA de propuestas)
+- questions_deadline: "2026-01-25" (fecha límite de consultas)
+- project_duration: "18 meses" (duración del contrato)
+
+INCORRECTO sería usar "2026-01-15" (es fecha de publicación)
+INCORRECTO sería usar "2026-03-01" (es fecha de inicio del proyecto)
+```
 
 ## CATEGORIAS VALIDAS
 

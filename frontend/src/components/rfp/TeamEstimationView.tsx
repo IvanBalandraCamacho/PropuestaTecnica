@@ -3,7 +3,7 @@
  */
 import React, { useState } from 'react';
 import { Table, Tag, Space, Typography, Tooltip, Empty, Card, Statistic, Row, Col, InputNumber } from 'antd';
-import { TeamOutlined, SafetyCertificateOutlined, CodeOutlined } from '@ant-design/icons';
+import { TeamOutlined } from '@ant-design/icons';
 import type { TeamEstimation, RoleEstimation, Seniority } from '../../types';
 import type { ColumnsType } from 'antd/es/table';
 
@@ -44,7 +44,7 @@ const TeamEstimationView: React.FC<TeamEstimationViewProps> = ({ teamEstimation,
   // Función para actualizar la cantidad de un rol
   const handleQuantityChange = (roleId: string, newQuantity: number | null) => {
     if (newQuantity === null || newQuantity < 1) return;
-    
+
     setEditableRoles(prevRoles =>
       prevRoles.map(role =>
         role.role_id === roleId
@@ -128,39 +128,52 @@ const TeamEstimationView: React.FC<TeamEstimationViewProps> = ({ teamEstimation,
       title: 'Skills Requeridos',
       dataIndex: 'required_skills',
       key: 'required_skills',
+      width: 180,
+      ellipsis: true,
       render: (skills: string[]) => (
-        <Space wrap size={[4, 4]}>
-          {skills.slice(0, 4).map((skill, i) => (
-            <Tag key={i} icon={<CodeOutlined />} color="cyan">
-              {skill}
-            </Tag>
-          ))}
-          {skills.length > 4 && (
-            <Tooltip title={skills.slice(4).join(', ')}>
-              <Tag>+{skills.length - 4} más</Tag>
-            </Tooltip>
-          )}
-        </Space>
+        <div style={{ maxWidth: 180, overflow: 'hidden' }}>
+          <Space wrap size={[2, 2]} style={{ maxHeight: 60, overflow: 'hidden' }}>
+            {skills.slice(0, 3).map((skill, i) => (
+              <Tag key={i} style={{ fontSize: 11, margin: 0, maxWidth: 80, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {skill}
+              </Tag>
+            ))}
+            {skills.length > 3 && (
+              <Tooltip title={skills.slice(3).join(', ')}>
+                <Tag style={{ fontSize: 11, margin: 0 }}>+{skills.length - 3}</Tag>
+              </Tooltip>
+            )}
+          </Space>
+        </div>
       ),
     },
     {
       title: 'Certificaciones',
       dataIndex: 'required_certifications',
       key: 'required_certifications',
+      width: 160,
+      ellipsis: true,
       render: (certs: string[]) => (
-        <Space wrap size={[4, 4]}>
-          {certs.slice(0, 2).map((cert, i) => (
-            <Tag key={i} icon={<SafetyCertificateOutlined />} color="green">
-              {cert}
-            </Tag>
-          ))}
-          {certs.length > 2 && (
-            <Tooltip title={certs.slice(2).join(', ')}>
-              <Tag>+{certs.length - 2} más</Tag>
-            </Tooltip>
+        <div style={{ maxWidth: 160, overflow: 'hidden' }}>
+          {certs.length === 0 ? (
+            <Text type="secondary">-</Text>
+          ) : (
+            <Space wrap size={[2, 2]} style={{ maxHeight: 60, overflow: 'hidden' }}>
+              {certs.slice(0, 2).map((cert, i) => (
+                <Tooltip key={i} title={cert}>
+                  <Tag style={{ fontSize: 11, margin: 0, maxWidth: 75, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} color="green">
+                    {cert.length > 10 ? cert.substring(0, 10) + '...' : cert}
+                  </Tag>
+                </Tooltip>
+              ))}
+              {certs.length > 2 && (
+                <Tooltip title={certs.slice(2).join(', ')}>
+                  <Tag style={{ fontSize: 11, margin: 0 }}>+{certs.length - 2}</Tag>
+                </Tooltip>
+              )}
+            </Space>
           )}
-          {certs.length === 0 && <Text type="secondary">-</Text>}
-        </Space>
+        </div>
       ),
     },
     {
@@ -226,13 +239,13 @@ const TeamEstimationView: React.FC<TeamEstimationViewProps> = ({ teamEstimation,
             <Statistic
               title="Tipo de Estimación"
               value={
-                teamEstimation.source === 'client_specified' 
-                  ? 'Cliente especificó' 
+                teamEstimation.source === 'client_specified'
+                  ? 'Cliente especificó'
                   : 'IA sugiere'
               }
-              valueStyle={{ 
+              valueStyle={{
                 color: teamEstimation.source === 'client_specified' ? '#1890ff' : '#722ed1',
-                fontSize: 14 
+                fontSize: 14
               }}
             />
             <Typography.Text type="secondary" style={{ fontSize: 11 }}>
@@ -258,8 +271,8 @@ const TeamEstimationView: React.FC<TeamEstimationViewProps> = ({ teamEstimation,
 
       {/* Source info */}
       <Tag color={teamEstimation.source === 'client_specified' ? 'blue' : 'purple'}>
-        {teamEstimation.source === 'client_specified' 
-          ? 'Equipo especificado por el cliente' 
+        {teamEstimation.source === 'client_specified'
+          ? 'Equipo especificado por el cliente'
           : 'Equipo estimado por IA'}
       </Tag>
 
@@ -272,6 +285,8 @@ const TeamEstimationView: React.FC<TeamEstimationViewProps> = ({ teamEstimation,
         pagination={false}
         size="middle"
         bordered
+        scroll={{ x: 1000 }}
+        tableLayout="fixed"
       />
 
       {/* Rationale */}
