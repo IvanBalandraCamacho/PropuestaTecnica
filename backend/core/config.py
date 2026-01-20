@@ -24,16 +24,16 @@ class Settings(BaseSettings):
     # API
     API_V1_PREFIX: str = "/api/v1"
     
-    # Database URLs - Production
+    # Database URLs - Production (MUST be set in .env)
     DATABASE_URL_PRODUCTION: str = Field(
-        default="postgresql+asyncpg://postgres.xuyvmxxkxumknsyzhtas:Tivit2025..@aws-1-us-east-1.pooler.supabase.com:6543/postgres",
-        description="PostgreSQL connection string for PRODUCTION"
+        default="",
+        description="PostgreSQL connection string for PRODUCTION - REQUIRED in .env"
     )
     
-    # Database URLs - Development
+    # Database URLs - Development (MUST be set in .env)
     DATABASE_URL_DEVELOPMENT: str = Field(
-        default="postgresql+asyncpg://postgres.sgzlxnpbtctcewbppdsy:CX3dBitzyIPyr7G6@aws-1-us-east-1.pooler.supabase.com:6543/postgres",
-        description="PostgreSQL connection string for DEVELOPMENT"
+        default="",
+        description="PostgreSQL connection string for DEVELOPMENT - REQUIRED in .env"
     )
     
     @property
