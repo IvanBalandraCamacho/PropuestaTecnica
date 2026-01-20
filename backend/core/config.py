@@ -15,19 +15,49 @@ class Settings(BaseSettings):
     APP_VERSION: str = "1.0.0"
     DEBUG: bool = False
     
+    # Environment (development or production)
+    ENV: str = Field(
+        default="development",
+        description="Environment: development or production"
+    )
+    
     # API
     API_V1_PREFIX: str = "/api/v1"
     
-    # Database (Cloud SQL PostgreSQL)
-    DATABASE_URL: str = Field(
-        default="postgresql+asyncpg://postgres:postgres@localhost:5432/rfp_analyzer",
-        description="PostgreSQL connection string"
+    # Database URLs - Production
+    DATABASE_URL_PRODUCTION: str = Field(
+        default="postgresql+asyncpg://postgres.xuyvmxxkxumknsyzhtas:Tivit2025..@aws-1-us-east-1.pooler.supabase.com:6543/postgres",
+        description="PostgreSQL connection string for PRODUCTION"
     )
+    
+    # Database URLs - Development
+    DATABASE_URL_DEVELOPMENT: str = Field(
+        default="postgresql+asyncpg://postgres.sgzlxnpbtctcewbppdsy:CX3dBitzyIPyr7G6@aws-1-us-east-1.pooler.supabase.com:6543/postgres",
+        description="PostgreSQL connection string for DEVELOPMENT"
+    )
+    
+    @property
+    def DATABASE_URL(self) -> str:
+        """
+        Returns the appropriate database URL based on the ENV setting.
+        - ENV=production -> DATABASE_URL_PRODUCTION
+        - ENV=development -> DATABASE_URL_DEVELOPMENT
+        """
+        if self.ENV.lower() == "production":
+            return self.DATABASE_URL_PRODUCTION
+        else:
+            return self.DATABASE_URL_DEVELOPMENT
     
     # GCP Settings
     GCP_PROJECT_ID: str = Field(default="squad-ia-latam", description="Google Cloud Project ID")
     GCP_LOCATION: str = Field(default="us-central1", description="GCP Region")
     GCS_BUCKET: str = Field(default="caso01-documents", description="Cloud Storage bucket for RFP files")
+    
+    # Storage Configuration
+    USE_GCS: bool = Field(
+        default=False,
+        description="Enable Google Cloud Storage (True) or use only local storage (False)"
+    )
     
     # GCP Credentials (Service Account JSON path - for Cloud Storage)
     GOOGLE_APPLICATION_CREDENTIALS: str | None = Field(

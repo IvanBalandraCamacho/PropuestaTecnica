@@ -18,71 +18,80 @@ Primero, determina cual de los 4 escenarios aplica:
 - **Escenario D**: El RFP NO menciona equipo/personal Y NO menciona presupuesto
   -> Sugerir equipo Y estimar presupuesto
 
-## PASO 2: BUSCAR TARIFAS DE MERCADO (GROUNDING)
+## PASO 2: ESTIMAR TARIFAS DE MERCADO
 
-IMPORTANTE: USA GOOGLE SEARCH para obtener tarifas de mercado actuales EN LATINOAMERICA.
+Usa tu conocimiento del mercado laboral para estimar tarifas REALISTAS en LATINOAMERICA.
 
-El pais se detecta automaticamente del RFP (campo "country"). USA ESE PAIS para las busquedas.
+IMPORTANTE - Contexto Regional:
+- Este análisis es para LATINOAMERICA, NO Estados Unidos o Europa
+- Los salarios en LATAM son SIGNIFICATIVAMENTE menores (típicamente 40-70% menos que USA)
+- Considera el país específico del RFP para ajustar estimaciones
+- Usa USD como moneda estándar para facilitar comparaciones
 
-Para CADA ROL que identifiques, busca tarifas REALISTAS para Latinoamerica:
-- "salario promedio [rol] [pais] 2025 pesos" o moneda local
-- "sueldo [rol] [pais] mensual"  
-- "[rol] salario [pais] latinoamerica"
-- "glassdoor [rol] [pais]"
+Guías Generales para Estimación:
+1. **Contexto Geográfico**: Considera economía del país
+   - Tier Alto: Chile, Brasil, México (salarios ~15-25% más altos)
+   - Tier Medio: Colombia, Perú (salarios promedio regional)
+   - Tier Variable: Argentina (considera fluctuación económica)
 
-NOTA IMPORTANTE SOBRE TARIFAS LATAM:
-- Los salarios en Latinoamerica son SIGNIFICATIVAMENTE menores que en USA/Europa
-- Un Developer Senior en Chile/Colombia/Peru gana entre USD $2,000 - $4,000 mensuales, NO $6,000+
-- Un Project Manager en LATAM gana entre USD $2,500 - $5,000 mensuales
-- Un DevOps/Cloud en LATAM gana entre USD $2,500 - $4,500 mensuales
-- Un QA en LATAM gana entre USD $1,500 - $3,000 mensuales
-- Un Junior/Mid gana 40-60% menos que un Senior
+2. **Diferencias por Seniority**:
+   - Junior: 40-60% del salario de un Senior
+   - Mid-level: 65-80% del salario de un Senior
+   - Senior: Referencia base
+   - Lead/Architect: 130-160% del salario de un Senior
 
-Referencias de tarifas mensuales promedio en USD por pais:
-- Chile: Dev Sr $2,800-$4,000 | PM $3,000-$4,500 | DevOps $3,000-$4,200
-- Colombia: Dev Sr $2,000-$3,200 | PM $2,500-$3,800 | DevOps $2,200-$3,500
-- Peru: Dev Sr $1,800-$3,000 | PM $2,200-$3,500 | DevOps $2,000-$3,200
-- Argentina: Dev Sr $1,500-$2,800 | PM $2,000-$3,200 | DevOps $1,800-$3,000
-- Mexico: Dev Sr $2,200-$3,500 | PM $2,800-$4,000 | DevOps $2,500-$3,800
-- Brasil: Dev Sr $2,500-$4,000 | PM $3,000-$4,500 | DevOps $2,800-$4,200
+3. **Especialización**:
+   - Roles especializados (ML, Cloud Architect, Security): +20-30%
+   - Tecnologías modernas (React, AWS, Kubernetes): +10-15%
+   - Stack legacy o común: Salario base
 
-Ejemplos de busquedas correctas:
-- "salario desarrollador java senior chile 2025"
-- "sueldo project manager TI colombia mensual"
-- "devops engineer salario peru promedio"
+4. **Principio de Realismo**:
+   - Sé CONSERVADOR en tus estimaciones
+   - Es mejor subestimar ligeramente que sobrestimar
+   - Recuerda: estamos en LATAM, no USA/Europa
 
-## PASO 3: CALCULAR Y ANALIZAR
+NO inventes números arbitrarios. Usa tu conocimiento actualizado del mercado laboral LATAM.
 
-Segun el escenario:
+## PASO 3: ANALIZAR EQUIPO Y COSTOS
 
-**Escenario A (Validar):**
+Según el escenario detectado:
+
+**Escenario A (Cliente define equipo + presupuesto - Validar viabilidad):**
 1. Tomar el equipo que pide el cliente
-2. Buscar tarifas de mercado para cada rol
+2. Estimar tarifas de mercado para cada rol (basado en país, seniority, especialización)
 3. Calcular costo total mensual
 4. Comparar con presupuesto del cliente
 5. Determinar si es VIABLE o INSUFICIENTE
+6. Proporcionar recomendaciones si hay desajuste
 
-**Escenario B (Sugerir equipo):**
-1. Analizar alcance del proyecto
-2. Proponer equipo optimo (roles, cantidad, seniority)
-3. Buscar tarifas de mercado
-4. Verificar que quepa en presupuesto
-5. Ajustar si es necesario
+**Escenario B (Sin equipo + con presupuesto - Sugerir equipo óptimo):**
+1. Analizar alcance y complejidad del proyecto
+2. Proponer equipo óptimo (roles, cantidad, seniority)
+3. Estimar tarifas de mercado para cada rol
+4. Calcular costo total y verificar que quepa en presupuesto
+5. Ajustar equipo si es necesario (reducir seniority o cantidad)
+6. Justificar la propuesta
 
-**Escenario C (Estimar presupuesto):**
+**Escenario C (Con equipo + sin presupuesto - Estimar presupuesto necesario):**
 1. Tomar el equipo que pide el cliente
-2. Buscar tarifas de mercado
-3. Calcular costo base
-4. Agregar margen operativo (20%)
-5. Proponer presupuesto
+2. Estimar tarifas de mercado para cada rol
+3. Calcular costo base mensual
+4. Agregar margen operativo (20% para costos indirectos)
+5. Proponer presupuesto mensual y total
+6. Calcular duración total del proyecto
 
-**Escenario D (Sugerir todo):**
-1. Analizar alcance del proyecto
-2. Proponer equipo optimo
-3. Buscar tarifas de mercado
-4. Calcular costo base
+**Escenario D (Sin equipo + sin presupuesto - Sugerir equipo y presupuesto):**
+1. Analizar alcance, complejidad y duración del proyecto
+2. Proponer equipo óptimo basado en necesidades
+3. Estimar tarifas de mercado para cada rol
+4. Calcular costo base mensual
 5. Agregar margen operativo (20%)
-6. Proponer presupuesto
+6. Proponer presupuesto mensual y total del proyecto
+
+Para CADA rol en team_estimation, incluye en market_rate:
+- min, max, average: Rangos estimados para el país específico
+- source: "AI estimation based on LATAM market knowledge"
+- Justificación: Breve explicación del rango (país, seniority, tecnologías)
 
 ## PASO 4: CERTIFICACIONES RECOMENDADAS
 

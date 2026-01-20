@@ -3,17 +3,17 @@
  */
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { 
-  Layout, Typography, Card, Descriptions, Tag, Button, Space, 
+import {
+  Layout, Typography, Card, Descriptions, Tag, Button, Space,
   Spin, Modal, Input, message, Row, Col, Alert, Divider, List, Tabs,
-  Form, Select, DatePicker, InputNumber
+  Form, Select, DatePicker, InputNumber, Tooltip
 } from 'antd';
-import { 
-  ArrowLeftOutlined, CheckOutlined, CloseOutlined, 
+import {
+  ArrowLeftOutlined, CheckOutlined, CloseOutlined,
   ExclamationCircleOutlined, CalendarOutlined, DollarOutlined,
   GlobalOutlined, CodeOutlined, TeamOutlined, SearchOutlined, ReloadOutlined,
   EditOutlined, SaveOutlined, CloseCircleOutlined, NumberOutlined, AppstoreOutlined,
-  ClockCircleOutlined, RobotOutlined
+  ClockCircleOutlined, RobotOutlined, FileTextOutlined
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { rfpApi } from '../lib/api';
@@ -82,6 +82,7 @@ const RFPDetailPage: React.FC = () => {
   useEffect(() => {
     if (rfp) {
       form.setFieldsValue({
+        title: rfp.title,
         client_name: rfp.client_name,
         country: rfp.country,
         category: rfp.category,
@@ -96,8 +97,8 @@ const RFPDetailPage: React.FC = () => {
   }, [rfp, form]);
 
   // Team estimation data
-  const { 
-    data: teamData, 
+  const {
+    data: teamData,
     isLoading: teamDataLoading,
   } = useQuery({
     queryKey: ['rfp-team-estimation', id],
@@ -178,6 +179,7 @@ const RFPDetailPage: React.FC = () => {
     try {
       const values = await form.validateFields();
       const updateData: RFPUpdate = {
+        title: values.title,
         client_name: values.client_name,
         country: values.country,
         category: values.category,
@@ -199,6 +201,7 @@ const RFPDetailPage: React.FC = () => {
     // Reset form to original values
     if (rfp) {
       form.setFieldsValue({
+        title: rfp.title,
         client_name: rfp.client_name,
         country: rfp.country,
         category: rfp.category,
@@ -226,6 +229,49 @@ const RFPDetailPage: React.FC = () => {
     return category
       .replace(/_/g, ' ')
       .replace(/\b\w/g, (char) => char.toUpperCase());
+  };
+
+  // Formatear duración a formato humano (semanas, meses, años)
+  const formatDuration = (duration: string | number | null | undefined): { display: string; tooltip: string | null } => {
+    if (!duration) return { display: '-', tooltip: null };
+
+    // Si es string, intentar extraer número de días
+    let days: number;
+    const durationStr = String(duration).toLowerCase();
+
+    // Detectar si ya tiene formato (ej: "12 meses", "6 semanas")
+    if (durationStr.includes('mes') || durationStr.includes('month')) {
+      return { display: String(duration), tooltip: null };
+    }
+    if (durationStr.includes('año') || durationStr.includes('year')) {
+      return { display: String(duration), tooltip: null };
+    }
+    if (durationStr.includes('semana') || durationStr.includes('week')) {
+      return { display: String(duration), tooltip: null };
+    }
+
+    // Extraer número
+    const match = durationStr.match(/(\d+)/);
+    if (!match) return { display: String(duration), tooltip: null };
+
+    days = parseInt(match[1], 10);
+    if (isNaN(days) || days <= 0) return { display: String(duration), tooltip: null };
+
+    const exactDays = `${days} días`;
+
+    // Redondear según magnitud
+    if (days >= 365) {
+      const years = Math.round(days / 365 * 10) / 10; // 1 decimal
+      return { display: `${years} año${years !== 1 ? 's' : ''}`, tooltip: exactDays };
+    } else if (days >= 30) {
+      const months = Math.round(days / 30 * 10) / 10;
+      return { display: `${months} mes${months !== 1 ? 'es' : ''}`, tooltip: exactDays };
+    } else if (days >= 7) {
+      const weeks = Math.round(days / 7 * 10) / 10;
+      return { display: `${weeks} semana${weeks !== 1 ? 's' : ''}`, tooltip: exactDays };
+    }
+
+    return { display: exactDays, tooltip: null };
   };
 
   if (isLoading) {
@@ -264,28 +310,28 @@ const RFPDetailPage: React.FC = () => {
         <Row gutter={24}>
           {/* Main Info */}
           <Col span={16}>
-            <Card 
-              title="Información del RFP" 
+            <Card
+              title="Información del RFP"
               style={{ marginBottom: 24 }}
               extra={
                 !isEditing ? (
-                  <Button 
-                    icon={<EditOutlined />} 
+                  <Button
+                    icon={<EditOutlined />}
                     onClick={() => setIsEditing(true)}
                   >
                     Editar
                   </Button>
                 ) : (
                   <Space>
-                    <Button 
-                      icon={<CloseCircleOutlined />} 
+                    <Button
+                      icon={<CloseCircleOutlined />}
                       onClick={handleCancelEdit}
                     >
                       Cancelar
                     </Button>
-                    <Button 
-                      type="primary" 
-                      icon={<SaveOutlined />} 
+                    <Button
+                      type="primary"
+                      icon={<SaveOutlined />}
                       onClick={handleSaveEdit}
                       loading={updateMutation.isPending}
                     >
@@ -298,6 +344,9 @@ const RFPDetailPage: React.FC = () => {
               {!isEditing ? (
                 <>
                   <Descriptions column={2}>
+                    <Descriptions.Item label={<><FileTextOutlined style={{ marginRight: 4 }} /> Nombre del Proyecto</>} span={2}>
+                      {rfp.title || '-'}
+                    </Descriptions.Item>
                     <Descriptions.Item label={<><GlobalOutlined style={{ marginRight: 4 }} /> País</>}>
                       {rfp.country || '-'}
                     </Descriptions.Item>
@@ -316,7 +365,14 @@ const RFPDetailPage: React.FC = () => {
                       {rfp.proposal_deadline ? dayjs(rfp.proposal_deadline).format('DD/MM/YYYY') : '-'}
                     </Descriptions.Item>
                     <Descriptions.Item label={<><ClockCircleOutlined style={{ marginRight: 4 }} /> Duración Proyecto</>}>
-                      {rfp.project_duration || '-'}
+                      {(() => {
+                        const { display, tooltip } = formatDuration(rfp.project_duration);
+                        return tooltip ? (
+                          <Tooltip title={tooltip}>
+                            <span style={{ cursor: 'help', borderBottom: '1px dashed #999' }}>{display}</span>
+                          </Tooltip>
+                        ) : display;
+                      })()}
                     </Descriptions.Item>
                     <Descriptions.Item label={<><RobotOutlined style={{ marginRight: 4 }} /> Confianza IA</>}>
                       {rfp.confidence_score ? `${rfp.confidence_score}%` : '-'}
@@ -326,6 +382,11 @@ const RFPDetailPage: React.FC = () => {
               ) : (
                 <Form form={form} layout="vertical">
                   <Row gutter={16}>
+                    <Col span={12}>
+                      <Form.Item label="Nombre del Proyecto" name="title">
+                        <Input placeholder="Nombre o título del proyecto" />
+                      </Form.Item>
+                    </Col>
                     <Col span={12}>
                       <Form.Item label="Cliente" name="client_name">
                         <Input placeholder="Nombre del cliente" />
@@ -350,8 +411,8 @@ const RFPDetailPage: React.FC = () => {
                       </Form.Item>
                     </Col>
                     <Col span={12}>
-                      <Form.Item 
-                        label="TVT" 
+                      <Form.Item
+                        label="TVT"
                         name="tvt"
                         rules={[{ validator: validateTVT }]}
                         tooltip="Solo números. Puede iniciar con 0."
@@ -361,8 +422,8 @@ const RFPDetailPage: React.FC = () => {
                     </Col>
                     <Col span={8}>
                       <Form.Item label="Presupuesto Mín" name="budget_min">
-                        <InputNumber 
-                          style={{ width: '100%' }} 
+                        <InputNumber
+                          style={{ width: '100%' }}
                           placeholder="Mínimo"
                           formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                         />
@@ -370,8 +431,8 @@ const RFPDetailPage: React.FC = () => {
                     </Col>
                     <Col span={8}>
                       <Form.Item label="Presupuesto Máx" name="budget_max">
-                        <InputNumber 
-                          style={{ width: '100%' }} 
+                        <InputNumber
+                          style={{ width: '100%' }}
                           placeholder="Máximo"
                           formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                         />
@@ -401,7 +462,7 @@ const RFPDetailPage: React.FC = () => {
                   </Row>
                 </Form>
               )}
-              
+
               {rfp.summary && (
                 <>
                   <Divider />
@@ -424,7 +485,7 @@ const RFPDetailPage: React.FC = () => {
 
             {/* Risks */}
             {extracted?.risks && extracted.risks.length > 0 && (
-              <Card 
+              <Card
                 title={<><ExclamationCircleOutlined style={{ marginRight: 6 }} /> Riesgos Identificados</>}
                 style={{ marginBottom: 24 }}
               >
@@ -443,8 +504,8 @@ const RFPDetailPage: React.FC = () => {
                           avatar={
                             <Tag color={
                               risk.severity === 'critical' ? 'red' :
-                              risk.severity === 'high' ? 'orange' :
-                              risk.severity === 'medium' ? 'gold' : 'default'
+                                risk.severity === 'high' ? 'orange' :
+                                  risk.severity === 'medium' ? 'gold' : 'default'
                             } style={{ minWidth: 70, textAlign: 'center' }}>
                               {severityLabels[risk.severity] || risk.severity.toUpperCase()}
                             </Tag>
@@ -461,7 +522,7 @@ const RFPDetailPage: React.FC = () => {
           </Col>
 
           {/* Sidebar */}
-          <Col span={8}>
+          < Col span={8} >
             {/* Recommendation Reasons */}
             {extracted?.recommendation_reasons && extracted.recommendation_reasons.length > 0 && (
               <Card title="Razones de la Recomendación" style={{ marginBottom: 24 }}>
@@ -478,63 +539,69 @@ const RFPDetailPage: React.FC = () => {
             )}
 
             {/* SLAs */}
-            {extracted?.sla && extracted.sla.length > 0 && (
-              <Card title="SLAs" style={{ marginBottom: 24 }}>
-                <List
-                  size="small"
-                  dataSource={extracted.sla}
-                  renderItem={(sla) => (
-                    <List.Item>
-                      <Space direction="vertical" size={0}>
-                        <Text strong>{sla.description}</Text>
-                        {sla.metric && <Text type="secondary">{sla.metric}</Text>}
-                        {sla.is_aggressive && <Tag color="red">Agresivo</Tag>}
-                      </Space>
-                    </List.Item>
-                  )}
-                />
-              </Card>
-            )}
+            {
+              extracted?.sla && extracted.sla.length > 0 && (
+                <Card title="SLAs" style={{ marginBottom: 24 }}>
+                  <List
+                    size="small"
+                    dataSource={extracted.sla}
+                    renderItem={(sla) => (
+                      <List.Item>
+                        <Space direction="vertical" size={0}>
+                          <Text strong>{sla.description}</Text>
+                          {sla.metric && <Text type="secondary">{sla.metric}</Text>}
+                          {sla.is_aggressive && <Tag color="red">Agresivo</Tag>}
+                        </Space>
+                      </List.Item>
+                    )}
+                  />
+                </Card>
+              )
+            }
 
             {/* Penalties */}
-            {extracted?.penalties && extracted.penalties.length > 0 && (
-              <Card title="Penalidades" style={{ marginBottom: 24 }}>
-                <List
-                  size="small"
-                  dataSource={extracted.penalties}
-                  renderItem={(penalty) => (
-                    <List.Item>
-                      <Space direction="vertical" size={0}>
-                        <Text strong>{penalty.description}</Text>
-                        {penalty.amount && <Text type="secondary">{penalty.amount}</Text>}
-                        {penalty.is_high && <Tag color="red">Alta</Tag>}
-                      </Space>
-                    </List.Item>
-                  )}
-                />
-              </Card>
-            )}
+            {
+              extracted?.penalties && extracted.penalties.length > 0 && (
+                <Card title="Penalidades" style={{ marginBottom: 24 }}>
+                  <List
+                    size="small"
+                    dataSource={extracted.penalties}
+                    renderItem={(penalty) => (
+                      <List.Item>
+                        <Space direction="vertical" size={0}>
+                          <Text strong>{penalty.description}</Text>
+                          {penalty.amount && <Text type="secondary">{penalty.amount}</Text>}
+                          {penalty.is_high && <Tag color="red">Alta</Tag>}
+                        </Space>
+                      </List.Item>
+                    )}
+                  />
+                </Card>
+              )
+            }
 
             {/* Decision Info */}
-            {rfp.decision && (
-              <Card title="Decisión Registrada">
-                <Tag color={rfp.decision === 'go' ? 'success' : 'error'} style={{ fontSize: 16, padding: '4px 12px' }}>
-                  {rfp.decision.toUpperCase()}
-                </Tag>
-                {rfp.decision_reason && (
-                  <Paragraph style={{ marginTop: 12 }}>
-                    <Text strong>Razón:</Text> {rfp.decision_reason}
-                  </Paragraph>
-                )}
-                {rfp.decided_at && (
-                  <Text type="secondary">
-                    {dayjs(rfp.decided_at).format('DD/MM/YYYY HH:mm')}
-                  </Text>
-                )}
-              </Card>
-            )}
-          </Col>
-        </Row>
+            {
+              rfp.decision && (
+                <Card title="Decisión Registrada">
+                  <Tag color={rfp.decision === 'go' ? 'success' : 'error'} style={{ fontSize: 16, padding: '4px 12px' }}>
+                    {rfp.decision.toUpperCase()}
+                  </Tag>
+                  {rfp.decision_reason && (
+                    <Paragraph style={{ marginTop: 12 }}>
+                      <Text strong>Razón:</Text> {rfp.decision_reason}
+                    </Paragraph>
+                  )}
+                  {rfp.decided_at && (
+                    <Text type="secondary">
+                      {dayjs(rfp.decided_at).format('DD/MM/YYYY HH:mm')}
+                    </Text>
+                  )}
+                </Card>
+              )
+            }
+          </Col >
+        </Row >
       ),
     },
     {
@@ -546,8 +613,8 @@ const RFPDetailPage: React.FC = () => {
         </span>
       ),
       children: (
-        <TeamEstimationView 
-          teamEstimation={teamData?.team_estimation || null} 
+        <TeamEstimationView
+          teamEstimation={teamData?.team_estimation || null}
           loading={teamDataLoading}
         />
       ),
@@ -561,8 +628,8 @@ const RFPDetailPage: React.FC = () => {
         </span>
       ),
       children: (
-        <CostEstimationView 
-          costEstimation={teamData?.cost_estimation || null} 
+        <CostEstimationView
+          costEstimation={teamData?.cost_estimation || null}
           loading={teamDataLoading}
         />
       ),
@@ -606,8 +673,8 @@ const RFPDetailPage: React.FC = () => {
             </Space>
           </Card>
 
-          <SuggestedTeamView 
-            suggestedTeam={teamData?.suggested_team || null} 
+          <SuggestedTeamView
+            suggestedTeam={teamData?.suggested_team || null}
             loading={suggestTeamMutation.isPending}
           />
         </Space>
@@ -620,8 +687,8 @@ const RFPDetailPage: React.FC = () => {
       <Content style={{ padding: 24 }}>
         {/* Header */}
         <div style={{ marginBottom: 24 }}>
-          <Button 
-            icon={<ArrowLeftOutlined />} 
+          <Button
+            icon={<ArrowLeftOutlined />}
             onClick={() => navigate('/')}
             style={{ marginBottom: 16 }}
           >
@@ -641,7 +708,7 @@ const RFPDetailPage: React.FC = () => {
                 )}
               </Space>
             </div>
-            
+
             {/* Decision Buttons */}
             {rfp.status === 'analyzed' && !rfp.decision && (
               <Space size="large">
@@ -670,8 +737,8 @@ const RFPDetailPage: React.FC = () => {
             )}
 
             {rfp.decision === 'go' && (
-              <Button 
-                type="primary" 
+              <Button
+                type="primary"
                 onClick={() => navigate(`/rfp/${id}/questions`)}
               >
                 Ver Preguntas
@@ -681,8 +748,8 @@ const RFPDetailPage: React.FC = () => {
         </div>
 
         {/* Tabs */}
-        <Tabs 
-          activeKey={activeTab} 
+        <Tabs
+          activeKey={activeTab}
           onChange={setActiveTab}
           items={tabItems}
           size="large"
