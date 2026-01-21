@@ -378,6 +378,7 @@ async def make_decision(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+
     """
     Registra la decisión GO/NO GO para un RFP.
     
