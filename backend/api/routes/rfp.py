@@ -2,6 +2,7 @@
 Endpoints para gestión de RFPs.
 Usa almacenamiento híbrido (GCS con fallback local).
 """
+import json
 import logging
 from datetime import datetime
 from uuid import UUID
@@ -30,6 +31,8 @@ from models.schemas import (
     TeamSuggestionRequest,
     TeamSuggestionResponse,
 )
+from schemas.chat import RFPChatRequest, RFPChatResponse
+from core.gcp import get_gemini_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/rfp", tags=["RFP"])
@@ -752,3 +755,313 @@ async def get_team_estimation(
         "cost_estimation": rfp.extracted_data.get("cost_estimation"),
         "suggested_team": rfp.extracted_data.get("suggested_team"),
     }
+
+
+# ============ CONTEXTUAL CHAT ============
+
+@router.post("/{rfp_id}/chat", response_model=RFPChatResponse)
+async def chat_with_rfp(
+    rfp_id: UUID,
+    request: RFPChatRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Chat contextual con un RFP.
+    
+    Responde preguntas basándose únicamente en los datos extraídos del RFP.
+    Usa el contexto compacto (extracted_data) para optimizar el consumo de tokens.
+    """
+    # Obtener RFP
+    result = await db.execute(
+        select(RFPSubmission).where(RFPSubmission.id == rfp_id)
+    )
+    rfp = result.scalar_one_or_none()
+    
+    if not rfp:
+        raise HTTPException(status_code=404, detail="RFP no encontrado")
+    
+    if not rfp.extracted_data:
+        raise HTTPException(
+            status_code=400, 
+            detail="RFP no tiene datos de análisis. Debe analizarse primero."
+        )
+    
+    # Construir contexto compacto desde extracted_data
+    extracted = rfp.extracted_data
+    context_parts = [
+        f"# Contexto del RFP: {rfp.file_name}",
+        f"Cliente: {rfp.client_name or 'No especificado'}",
+        f"País: {rfp.country or 'No especificado'}",
+        f"Categoría: {rfp.category or 'No especificada'}",
+        f"Resumen: {rfp.summary or 'No disponible'}",
+    ]
+    
+    # Agregar presupuesto si existe
+    budget = extracted.get("budget", {})
+    if budget:
+        budget_str = f"{budget.get('currency', 'USD')} {budget.get('amount_min', '?')} - {budget.get('amount_max', '?')}"
+        context_parts.append(f"Presupuesto: {budget_str}")
+        if budget.get("notes"):
+            context_parts.append(f"Notas de presupuesto: {budget.get('notes')}")
+    
+    # Agregar duración y fechas
+    if rfp.project_duration:
+        context_parts.append(f"Duración del proyecto: {rfp.project_duration}")
+    if rfp.proposal_deadline:
+        context_parts.append(f"Fecha límite de propuesta: {rfp.proposal_deadline}")
+    
+    # Agregar tecnologías
+    tech_stack = extracted.get("tech_stack", [])
+    if tech_stack:
+        context_parts.append(f"Stack tecnológico: {', '.join(tech_stack)}")
+    
+    # Agregar riesgos (importante para preguntas del usuario)
+    risks = extracted.get("risks", [])
+    if risks:
+        context_parts.append("\n## Riesgos identificados:")
+        for i, risk in enumerate(risks[:10], 1):  # Limitar a 10 riesgos
+            severity = risk.get('severity', 'N/A')
+            context_parts.append(f"{i}. [{severity.upper()}] {risk.get('category', '')}: {risk.get('description', '')}")
+    
+    # Agregar multas/penalidades
+    penalties = extracted.get("penalties", [])
+    if penalties:
+        context_parts.append("\n## Multas y penalidades:")
+        for i, penalty in enumerate(penalties[:10], 1):
+            amount = f" ({penalty.get('amount')})" if penalty.get('amount') else ""
+            high_tag = " [ALTA]" if penalty.get('is_high') else ""
+            context_parts.append(f"{i}. {penalty.get('description', '')}{amount}{high_tag}")
+    
+    # Agregar SLAs
+    slas = extracted.get("sla", [])
+    if slas:
+        context_parts.append("\n## SLAs:")
+        for i, sla in enumerate(slas[:10], 1):
+            metric = f" (Métrica: {sla.get('metric')})" if sla.get('metric') else ""
+            aggressive_tag = " [AGRESIVO]" if sla.get('is_aggressive') else ""
+            context_parts.append(f"{i}. {sla.get('description', '')}{metric}{aggressive_tag}")
+    
+    # Agregar experiencia requerida
+    exp_req = extracted.get("experience_required", {})
+    if exp_req and exp_req.get("required"):
+        mandatory = " (OBLIGATORIO)" if exp_req.get('is_mandatory') else ""
+        context_parts.append(f"\n## Experiencia requerida{mandatory}: {exp_req.get('details', 'Ver documento')}")
+    
+    # Agregar recomendación y razones
+    if extracted.get("recommendation"):
+        context_parts.append(f"\n## Recomendación: {extracted.get('recommendation')}")
+        reasons = extracted.get("recommendation_reasons", [])
+        if reasons:
+            context_parts.append("Razones: " + "; ".join(reasons[:5]))
+    
+    # Agregar equipo sugerido (team_estimation)
+    if extracted.get("team_estimation"):
+        team = extracted.get("team_estimation")
+        context_parts.append("\n## Equipo Sugerido por IA:")
+        context_parts.append(f"Tipo de estimación: {team.get('estimation_type', 'N/A')}")
+        context_parts.append(f"Confianza IA: {team.get('ai_confidence', 'N/A')}%")
+        
+        roles = team.get("roles", [])
+        if roles:
+            context_parts.append("Roles del equipo:")
+            for role in roles[:15]:  # Limitar a 15 roles
+                seniority = role.get('seniority', 'N/A')
+                count = role.get('count', 1)
+                dedication = role.get('dedication', 'Full Time')
+                rate = role.get('monthly_rate', 0)
+                context_parts.append(f"  - {role.get('role', 'Rol')}: {count}x {seniority} ({dedication}) - ${rate}/mes")
+        
+        if team.get("justification"):
+            context_parts.append(f"Justificación: {team.get('justification')[:300]}")
+    
+    # Agregar estimación de costos si existe
+    if extracted.get("cost_estimation"):
+        cost = extracted.get("cost_estimation")
+        context_parts.append("\n## Estimación de Costos:")
+        context_parts.append(f"Costo mensual equipo: ${cost.get('monthly_team_cost', 0):,.0f}")
+        context_parts.append(f"Duración estimada: {cost.get('duration_months', 0)} meses")
+        context_parts.append(f"Costo total estimado: ${cost.get('total_cost', 0):,.0f}")
+    
+    context = "\n".join(context_parts)
+    
+    # System prompt con instrucciones
+    system_prompt = f"""
+Eres un asistente experto en análisis de RFPs (Request for Proposals).
+Responde las preguntas del usuario ÚNICAMENTE basándote en el contexto del RFP proporcionado.
+
+Reglas:
+1. Sé conciso y directo en tus respuestas.
+2. Si la información solicitada NO está en el contexto, indícalo claramente.
+3. Cita secciones específicas cuando sea posible.
+4. Para preguntas sobre riesgos, multas o SLAs, destaca los elementos más críticos.
+5. Si el usuario pregunta sobre algo que podría afectar la propuesta comercial, advierte los riesgos potenciales.
+6. Mantén coherencia con el historial de la conversación.
+
+IMPORTANTE - Búsqueda de Candidatos:
+- Si el usuario pregunta por candidatos, equipo de TIVIT, o personas para el proyecto, usa la herramienta search_candidates.
+- El país por defecto del RFP es: {rfp.country or 'No especificado'}
+- Si el usuario NO menciona un país específico, usa el país del RFP.
+- Si el usuario menciona otro país (ej: "de Perú", "en México"), usa ese país en su lugar.
+"""
+    
+    # Construir prompt con historial de conversación
+    conversation_parts = [system_prompt, "\n", context, "\n"]
+    
+    # Agregar historial de conversación (últimos 20 mensajes)
+    if request.history:
+        conversation_parts.append("\n## Conversación previa:")
+        for msg in request.history[-20:]:
+            role_label = "Usuario" if msg.role == "user" else "Asistente"
+            conversation_parts.append(f"{role_label}: {msg.content}")
+        conversation_parts.append("")
+    
+    # Agregar mensaje actual
+    conversation_parts.append(f"Usuario: {request.message}")
+    conversation_parts.append("\nAsistente:")
+    
+    full_prompt = "\n".join(conversation_parts)
+    
+    # Definir herramienta de búsqueda de candidatos
+    search_candidates_tool = {
+        "name": "search_candidates",
+        "description": "Busca candidatos de TIVIT que coincidan con un rol o skill específico. Usa esta herramienta cuando el usuario pregunte por equipo, candidatos, ingenieros, desarrolladores, o personal de TIVIT para el proyecto.",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "Rol o skills a buscar (ej: 'Desarrollador Java Senior', 'QA Tester con Selenium', 'Project Manager')"
+                },
+                "country": {
+                    "type": "string", 
+                    "description": f"País para filtrar candidatos. Usa '{rfp.country}' si el usuario no especifica otro."
+                },
+                "limit": {
+                    "type": "integer",
+                    "description": "Cantidad máxima de candidatos a retornar (default: 5)"
+                }
+            },
+            "required": ["query"]
+        }
+    }
+    
+    # Llamar a Gemini con function calling
+    try:
+        import asyncio
+        from google.genai.types import Tool, FunctionDeclaration
+        
+        gemini = get_gemini_client()
+        
+        # Primera llamada: verificar si necesita usar herramienta
+        response = await asyncio.to_thread(
+            gemini.client.models.generate_content,
+            model="gemini-3-flash-preview",
+            contents=full_prompt,
+            config={
+                "temperature": 0.3,
+                "max_output_tokens": 8192,
+                "tools": [{
+                    "function_declarations": [search_candidates_tool]
+                }],
+            },
+        )
+        
+        # Verificar si hay function call
+        function_call = None
+        if response.candidates and response.candidates[0].content.parts:
+            for part in response.candidates[0].content.parts:
+                if hasattr(part, 'function_call') and part.function_call:
+                    function_call = part.function_call
+                    break
+        
+        final_response = ""
+        
+        if function_call and function_call.name == "search_candidates":
+            # Ejecutar búsqueda en MCP
+            args = dict(function_call.args) if function_call.args else {}
+            query = args.get("query", "")
+            country = args.get("country", rfp.country or None)
+            limit = args.get("limit", 5)
+            
+            logger.info(f"MCP search triggered: query='{query}', country='{country}', limit={limit}")
+            
+            # Llamar a MCP
+            mcp_client = get_mcp_client()
+            mcp_result = await mcp_client.search_single(
+                query=query,
+                limit=limit,
+                country=country
+            )
+            
+            # Formatear resultados para Gemini
+            candidates = mcp_result.get("candidatos", [])
+            
+            # Fallback: Si no hay resultados en el país específico, buscar globalmente
+            search_context_msg = ""
+            if not candidates and country:
+                logger.info(f"No candidates found in {country}, trying global search")
+                mcp_result_global = await mcp_client.search_single(
+                    query=query,
+                    limit=limit,
+                    country=None
+                )
+                candidates = mcp_result_global.get("candidatos", [])
+                if candidates:
+                    search_context_msg = f"⚠️ No se encontraron candidatos en {country}. Aquí hay sugerencias de otros países:"
+            
+            if candidates:
+                header = search_context_msg if search_context_msg else f"\n\n## Candidatos encontrados ({len(candidates)}):\n"
+                candidates_text = header
+                for i, c in enumerate(candidates[:limit], 1):
+                    certs = ", ".join([cert.get("nombre", "") for cert in c.get("certificaciones", [])[:3]])
+                    skills = ", ".join([s.get("nombre", "") for s in c.get("skills", [])[:5]])
+                    lider = c.get("lider", {}) or {}
+                    lider_info = f"{lider.get('nombre', 'N/A')} ({lider.get('email', 'N/A')})"
+                    
+                    candidates_text += f"""
+{i}. **{c.get('nombre', 'N/A')}** - {c.get('cargo', 'N/A')}
+   - País: {c.get('pais', 'N/A')}
+   - Email: {c.get('email', 'N/A')}
+   - Jefe Directo: {lider_info}
+   - Certificaciones: {certs or 'Ninguna'}
+   - Skills: {skills or 'No especificados'}
+"""
+            else:
+                candidates_text = "\n\nNo se encontraron candidatos que coincidan con la búsqueda."
+            
+            # Segunda llamada a Gemini con los resultados
+            followup_prompt = f"""{full_prompt}
+
+[Se ejecutó búsqueda de candidatos en TIVIT]
+Búsqueda: "{query}" en {country or 'todos los países'}
+{candidates_text}
+
+Basándote en estos resultados, responde al usuario de forma clara y útil. Si hay candidatos, preséntelos de forma organizada."""
+
+            response2 = await asyncio.to_thread(
+                gemini.client.models.generate_content,
+                model="gemini-3-flash-preview",
+                contents=followup_prompt,
+                config={
+                    "temperature": 0.3,
+                    "max_output_tokens": 8192,
+                },
+            )
+            final_response = response2.text if response2.text else "No pude generar una respuesta."
+        else:
+            # Sin function call, usar respuesta directa
+            final_response = response.text if response.text else "No pude generar una respuesta."
+        
+        return RFPChatResponse(
+            response=final_response,
+            rfp_id=str(rfp_id),
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in RFP chat: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error al procesar la consulta: {str(e)}"
+        )
+
