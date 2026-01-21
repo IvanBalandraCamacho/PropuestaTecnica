@@ -24,16 +24,16 @@ class Settings(BaseSettings):
     # API
     API_V1_PREFIX: str = "/api/v1"
     
-    # Database URLs - Production
+    # Database URLs - Production (MUST be set in .env)
     DATABASE_URL_PRODUCTION: str = Field(
-        default="postgresql+asyncpg://postgres.xuyvmxxkxumknsyzhtas:Tivit2025..@aws-1-us-east-1.pooler.supabase.com:6543/postgres",
-        description="PostgreSQL connection string for PRODUCTION"
+        default="",
+        description="PostgreSQL connection string for PRODUCTION - REQUIRED in .env"
     )
     
-    # Database URLs - Development
+    # Database URLs - Development (MUST be set in .env)
     DATABASE_URL_DEVELOPMENT: str = Field(
-        default="postgresql+asyncpg://postgres.sgzlxnpbtctcewbppdsy:CX3dBitzyIPyr7G6@aws-1-us-east-1.pooler.supabase.com:6543/postgres",
-        description="PostgreSQL connection string for DEVELOPMENT"
+        default="",
+        description="PostgreSQL connection string for DEVELOPMENT - REQUIRED in .env"
     )
     
     @property
@@ -81,11 +81,24 @@ class Settings(BaseSettings):
         description="Gemini model to use (gemini-3-pro-preview es el más potente para análisis complejos)"
     )
     
-    # MCP Talent Search Server
-    MCP_TALENT_URL: str = Field(
-        default="https://mcp-tivit.eastus2.cloudapp.azure.com",
-        description="URL of the MCP Talent Search Server"
+    # MCP Talent Search Server - Development (Docker)
+    MCP_TALENT_URL_DEVELOPMENT: str = Field(
+        default="http://mcp:8080",
+        description="MCP URL for development (Docker container)"
     )
+    
+    # MCP Talent Search Server - Production
+    MCP_TALENT_URL_PRODUCTION: str = Field(
+        default="",
+        description="MCP URL for production"
+    )
+    
+    @property
+    def MCP_TALENT_URL(self) -> str:
+        """Returns MCP URL based on ENV setting."""
+        if self.ENV.lower() == "production":
+            return self.MCP_TALENT_URL_PRODUCTION
+        return self.MCP_TALENT_URL_DEVELOPMENT
     
     # JWT Settings
     JWT_SECRET_KEY: str = Field(default="change-me-in-production", description="JWT secret key")
