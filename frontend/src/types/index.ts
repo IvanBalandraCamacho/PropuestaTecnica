@@ -335,3 +335,27 @@ export interface Experience {
     monto_final?: number;
     created_at: string;
 }
+
+// ============ CHAT ============
+
+export interface ChatMessage {
+    id: string;
+    role: 'user' | 'assistant';
+    content: string;
+    timestamp: Date;
+}
+
+export interface MCPChatResponse {
+    exito: boolean;
+    mensaje_original: string;
+    interpretacion: Record<string, unknown>;
+    candidatos: MCPCandidate[];
+    total: number;
+    respuesta_natural: string;
+}
+
+export interface RFPChatResponse {
+    response: string;
+    rfp_id: string;
+}
+

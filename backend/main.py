@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from core.config import settings
 from core.database import engine, Base
+from api.routes import rfp_router, dashboard_router, auth_router, proposal_router, certifications_router, experiences_router, chapters_router, chat_router
 from api.routes import rfp_router, dashboard_router, auth_router, proposal_router, certifications_router, experiences_router, chapters_router, storage_router
 
 # Configurar logging
@@ -68,6 +69,7 @@ app.include_router(proposal_router, prefix=settings.API_V1_PREFIX)
 app.include_router(certifications_router, prefix=settings.API_V1_PREFIX)
 app.include_router(experiences_router, prefix=settings.API_V1_PREFIX)
 app.include_router(chapters_router, prefix=settings.API_V1_PREFIX)
+app.include_router(chat_router, prefix=settings.API_V1_PREFIX)
 app.include_router(storage_router, prefix=settings.API_V1_PREFIX)
 
 
