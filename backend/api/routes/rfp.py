@@ -2,6 +2,10 @@
 Endpoints para gestión de RFPs.
 Usa almacenamiento híbrido (GCS con fallback local).
 """
+from core.services.storage_service import get_user_folder
+from core.services.storage_service import create_file
+from utils.constantes import Constantes
+from core.services.storage_service import create_folder
 import json
 import logging
 from datetime import datetime
@@ -137,12 +141,18 @@ async def upload_rfp(
     except Exception as e:
         logger.error(f"Error analyzing RFP {rfp.id}: {e}")
         try:
+            # Primero Rollback de la transacción fallida anterior
             await db.rollback()
-            # Re-fetch to avoid StaleDataError
-            rfp = await db.get(RFPSubmission, rfp.id)
-            if rfp:
-                rfp.status = RFPStatus.ERROR.value
+            
+            # Usar execute+select en lugar de get para evitar problemas de identidad en la sesión tras rollback
+            result = await db.execute(select(RFPSubmission).where(RFPSubmission.id == rfp.id))
+            rfp_db = result.scalar_one_or_none()
+            
+            if rfp_db:
+                rfp_db.status = RFPStatus.ERROR.value
                 await db.commit()
+                logger.info(f"RFP {rfp.id} marked as ERROR")
+                
         except Exception as db_e:
             logger.error(f"Failed to update RFP status to ERROR: {db_e}")
         
@@ -381,17 +391,8 @@ async def make_decision(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Registra la decisión GO/NO GO para un RFP.
-    
-    - Si es GO, genera preguntas para el cliente
-    - Si es NO GO, archiva el RFP
-    """
-    result = await db.execute(
-        select(RFPSubmission)
-        .options(selectinload(RFPSubmission.questions))
-        .where(RFPSubmission.id == rfp_id)
-    )
+
+    result = await db.execute(select(RFPSubmission).options(selectinload(RFPSubmission.questions)).where(RFPSubmission.id == rfp_id))
     rfp = result.scalar_one_or_none()
     
     if not rfp:
@@ -403,25 +404,75 @@ async def make_decision(
             detail="El RFP debe estar analizado antes de tomar una decisión"
         )
     
-    # Actualizar decisión
+
     rfp.decision = decision.decision
     rfp.decision_reason = decision.reason
     rfp.decided_at = datetime.utcnow()
     rfp.status = RFPStatus.GO.value if decision.decision == "go" else RFPStatus.NO_GO.value
-    
-    # Si es GO, generar preguntas en background
+ 
     if decision.decision == "go" and rfp.extracted_data:
+        await crear_carpetas_go(db, rfp, current_user.id)
         background_tasks.add_task(
             generate_questions_task, 
             str(rfp.id), 
             rfp.extracted_data
         )
     
+    if decision.decision == "no_go" and rfp.extracted_data:
+        await crear_carpetas_no_go(db, rfp, current_user.id)
+    
     await db.commit()
     await db.refresh(rfp)
     
     return RFPDetail.model_validate(rfp)
 
+
+async def crear_carpetas_go(db: AsyncSession, rfp: RFPSubmission, user_id: UUID):
+
+    if not rfp.tvt:
+        raise HTTPException( status_code=404, detail="TVT no encontrado")
+    
+    carpeta_go = await get_user_folder(db, user_id, Constantes.Storage.GO)
+
+    if not carpeta_go:
+        raise HTTPException( status_code=404, detail="Carpeta GO no encontrada")
+
+    carpeta_tvt = await create_folder(
+        db=db,
+        name=rfp.tvt, 
+        parent_id=carpeta_go.carpeta_id
+    )
+
+    # guardar rfp 
+    await create_file(
+        db=db,
+        name=rfp.file_gcs_path.rsplit("/", 1)[-1], 
+        carpeta_id=carpeta_tvt.carpeta_id, 
+        url=rfp.file_gcs_path
+    )
+
+async def crear_carpetas_no_go(db: AsyncSession, rfp: RFPSubmission, user_id: UUID):
+    
+    if not rfp.tvt:
+        raise HTTPException( status_code=404, detail="TVT no encontrado")
+
+    carpeta_no_go = await get_user_folder(db, user_id, Constantes.Storage.NO_GO)
+
+    if not carpeta_no_go:
+        raise HTTPException( status_code=404, detail="Carpeta NO GO no encontrada")
+
+    carpeta_tvt = await create_folder(
+        db=db,
+        name=rfp.tvt, 
+        parent_id=carpeta_no_go.carpeta_id
+    )
+
+    await create_file(
+        db=db,
+        name=rfp.file_gcs_path.rsplit("/", 1)[-1], 
+        carpeta_id=carpeta_tvt.carpeta_id, 
+        url=rfp.file_gcs_path
+    )
 
 async def generate_questions_task(rfp_id: str, extracted_data: dict):
     """Task en background para generar preguntas."""
