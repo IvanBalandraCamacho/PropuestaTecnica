@@ -16,6 +16,7 @@ import {
   SafetyCertificateOutlined,
   ProjectOutlined,
   ReadOutlined,
+  FolderOpenOutlined,
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -90,6 +91,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     if (path === '/certifications') return '/certifications';
     if (path === '/experiences') return '/experiences';
     if (path === '/chapters') return '/chapters';
+    if (path === '/storage') return '/storage';
     if (path === '/settings') return '/settings';
     return '/';
   };
@@ -136,6 +138,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     { key: '/experiences', icon: <ProjectOutlined />, label: 'Experiencias', onClick: () => navigate('/experiences') },
     { key: '/chapters', icon: <ReadOutlined />, label: 'Capítulos', onClick: () => navigate('/chapters') },
     { type: 'divider' as const },
+    { key: '/storage', icon: <FolderOpenOutlined />, label: 'Mis Archivos', onClick: () => navigate('/storage') },
     { key: '/settings', icon: <SettingOutlined />, label: 'Configuración', onClick: () => navigate('/settings') },
   ];
 
