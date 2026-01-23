@@ -55,9 +55,10 @@ export const storageService = {
   /**
    * Obtiene el contenido completo de una carpeta (info, hijos, archivos).
    */
-  getFolderContent: async (folderId: string): Promise<FolderContent> => {
+  getFolderContent: async (folderId: string, filters: Record<string, any> = {}): Promise<FolderContent> => {
     try {
       const response = await axios.get(`${API_URL}/folders/${folderId}`, {
+         params: filters,
          headers: {
             Authorization: `Bearer ${localStorage.getItem('access_token')}`
         }
