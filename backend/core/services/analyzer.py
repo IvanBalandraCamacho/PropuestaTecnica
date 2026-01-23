@@ -13,6 +13,7 @@ from docx import Document
 import io
 
 from core.gcp.gemini_client import get_gemini_client
+from core.services.parsers import get_parser_service
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from models.certification import Certification
@@ -66,16 +67,22 @@ Analiza el siguiente documento RFP y extrae la información estructurada en form
         "currency": "USD",
         "notes": "Notas sobre presupuesto"
     },
-    "proposal_deadline": "YYYY-MM-DD",
     "questions_deadline": "YYYY-MM-DD",
-    "project_duration": "Duración estimada del proyecto",
+    "project_duration": "Duración estimada [Fuente: doc_X, Pag Y]",
     "evaluation_criteria": [
         {"criterion": "nombre", "weight": 0.0}
     ],
-    "risks": [
-        {"risk": "descripción", "severity": "high/medium/low", "mitigation": "posible mitigación"}
+    "penalties": [
+        {"description": "Descripción de multa [Fuente: doc_X, Pag Y]", "amount": "Monto", "is_high": true}
     ],
-    "opportunities": ["Oportunidades identificadas para TIVIT"],
+    "sla": [
+        {"description": "Descripción del SLA [Fuente: doc_X, Pag Y]", "metric": "Metrica", "is_aggressive": true}
+    ],
+    "risks": [
+        {"risk": "descripción [Fuente: doc_X, Pag Y]", "severity": "high/medium/low", "mitigation": "posible mitigación", "category": "financial/technical/legal"}
+    ],
+    "opportunities": ["Oportunidad [Fuente: doc_X, Pag Y]"],
+    "recommendation_reasons": ["Razón 1 [Fuente: doc_X, Pag Y]", "Razón 2 [Fuente: doc_X, Pag Y]"],
     "confidence_score": 0.0,
     "recommendation": "GO o NO_GO con justificación breve"
 }
@@ -233,6 +240,80 @@ class RFPAnalyzerService:
             # Asumir texto plano
             return content.decode("utf-8", errors="ignore")
     
+    async def analyze_rfp_project(
+        self,
+        files: list[dict[str, Any]],  # List of {content: bytes, filename: str, type: str}
+        analysis_mode: str = "balanced",
+        db: AsyncSession | None = None,
+    ) -> dict[str, Any]:
+        """
+        Analiza un PROYECTO RFP completo (múltiples archivos).
+        Usa ingesta estructurada (Premium) y contexto XML.
+        """
+        logger.info(f"Starting Multi-File RFP Analysis. Files: {len(files)}")
+        
+        # 1. Construir Contexto Multimodal/Estructurado
+        context_parts = []
+        context_parts.append("<rfp_project_files>")
+        
+        parser = get_parser_service()
+        
+        for idx, file in enumerate(files, 1):
+            filename = file["filename"]
+            content = file["content"]
+            file_type = file.get("type", "unknown")
+            file_id = f"doc_{idx}"  # ID estable para citas
+            
+            logger.info(f"Processing File {idx}: {filename} ({file_type})")
+            
+            processed_content = ""
+            
+            if filename.lower().endswith(".xlsx") or filename.lower().endswith(".xls"):
+                # Parseo estructurado de Excel
+                processed_content = parser.parse_excel(content, filename)
+                
+            elif filename.lower().endswith(".pdf"):
+                # Para PDFs, usamos extracción de texto simple por ahora para el contexto global
+                # Opcional: Podríamos usar Gemini Vision separadamente si se necesitara
+                processed_content = self.extract_text_from_pdf(content)
+                
+            elif filename.lower().endswith(".docx"):
+                processed_content = self.extract_text_from_docx(content)
+                
+            else:
+                try:
+                    processed_content = content.decode("utf-8", errors="ignore")
+                except:
+                    processed_content = "[Contenido binario no legible]"
+            
+            # Envolver en XML tags con ID para citas
+            context_parts.append(f"""
+    <document id="{file_id}" name="{filename}" type="{file_type}">
+    {processed_content}
+    </document>""")
+
+        context_parts.append("</rfp_project_files>")
+        
+        full_context = "\n".join(context_parts)
+        
+        # 2. Preparar Prompt Premium
+        # Injectamos el contexto y las reglas de citación
+        # The analysis_prompt is expected to already contain the premium instructions.
+        # The full_context is passed as document_content.
+        
+        # 3. Llamada a Gemini (1.5 Pro maneja el contexto largo)
+        result = await self.gemini.analyze_document(
+            document_content=full_context,
+            prompt=self.analysis_prompt,
+            analysis_mode=analysis_mode,
+        )
+        
+        if isinstance(result, list) and result:
+             result = result[0]
+             
+        logger.info("Multi-File Analysis Completed")
+        return result
+
     async def analyze_rfp_from_content(
         self, 
         content: bytes, 

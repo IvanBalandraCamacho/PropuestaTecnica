@@ -5,6 +5,7 @@ import React, { useState } from 'react';
 import { Modal, Upload, message, Typography, Spin, Steps } from 'antd';
 import { InboxOutlined, LoadingOutlined, CheckCircleOutlined, FileSearchOutlined, CloudUploadOutlined } from '@ant-design/icons';
 import type { UploadProps } from 'antd';
+import type { RcFile } from 'antd/es/upload';
 import { rfpApi } from '../../lib/api';
 
 const { Dragger } = Upload;
@@ -20,18 +21,17 @@ type UploadStep = 'idle' | 'uploading' | 'analyzing' | 'complete' | 'error';
 
 const UploadModal: React.FC<UploadModalProps> = ({ open, onCancel, onSuccess }) => {
   const [step, setStep] = useState<UploadStep>('idle');
-  const [fileName, setFileName] = useState<string>('');
+  const [fileList, setFileList] = useState<RcFile[]>([]);
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   const resetState = () => {
     setStep('idle');
-    setFileName('');
+    setFileList([]);
     setErrorMessage('');
   };
 
   const handleCancel = () => {
     if (step === 'uploading' || step === 'analyzing') {
-      // No permitir cerrar durante el proceso
       message.warning('Por favor espera a que termine el análisis');
       return;
     }
@@ -39,48 +39,52 @@ const UploadModal: React.FC<UploadModalProps> = ({ open, onCancel, onSuccess }) 
     onCancel();
   };
 
+  const handleUpload = async () => {
+    if (fileList.length === 0) return;
+
+    setStep('uploading');
+    setErrorMessage('');
+
+    try {
+      setTimeout(() => setStep('analyzing'), 2000);
+
+      // Enviar todos los archivos
+      await rfpApi.upload(fileList);
+
+      setStep('complete');
+      message.success('Proyecto analizado exitosamente');
+
+      setTimeout(() => {
+        resetState();
+        onSuccess();
+      }, 1500);
+
+    } catch (error: any) {
+      setStep('error');
+      const errorMsg = error?.response?.data?.detail || error?.message || 'Error al procesar los archivos';
+      setErrorMessage(errorMsg);
+      message.error(errorMsg);
+    }
+  };
+
   const uploadProps: UploadProps = {
-    name: 'file',
-    multiple: false,
-    accept: '.pdf,.docx',
-    showUploadList: false,
+    name: 'files',
+    multiple: true,
+    fileList: fileList,
+    accept: '.pdf,.docx,.xlsx,.xls',
+    showUploadList: true,
     disabled: step !== 'idle',
-    beforeUpload: async (file) => {
-      // Validar tamaño (max 50MB)
+    beforeUpload: (file) => {
       const isLt50M = file.size / 1024 / 1024 < 50;
       if (!isLt50M) {
-        message.error('El archivo debe ser menor a 50MB');
-        return false;
+        message.error(`${file.name} debe ser menor a 50MB`);
+        return Upload.LIST_IGNORE;
       }
-
-      setFileName(file.name);
-      setStep('uploading');
-      setErrorMessage('');
-
-      try {
-        // Cambiar a analyzing después de un momento
-        setTimeout(() => setStep('analyzing'), 1000);
-
-        // El endpoint ahora es síncrono - espera al análisis
-        await rfpApi.upload(file);
-        
-        setStep('complete');
-        message.success('RFP analizado exitosamente');
-        
-        // Esperar un momento para mostrar el estado de éxito
-        setTimeout(() => {
-          resetState();
-          onSuccess();
-        }, 1500);
-        
-      } catch (error: any) {
-        setStep('error');
-        const errorMsg = error?.response?.data?.detail || error?.message || 'Error al procesar el archivo';
-        setErrorMessage(errorMsg);
-        message.error(errorMsg);
-      }
-
-      return false; // Prevenir upload automático
+      setFileList(prev => [...prev, file as RcFile]);
+      return false; // Prevent auto upload
+    },
+    onRemove: (file) => {
+      setFileList(prev => prev.filter(f => f.uid !== file.uid));
     },
   };
 
@@ -96,17 +100,48 @@ const UploadModal: React.FC<UploadModalProps> = ({ open, onCancel, onSuccess }) 
   const renderContent = () => {
     if (step === 'idle') {
       return (
-        <Dragger {...uploadProps}>
-          <p className="ant-upload-drag-icon">
-            <InboxOutlined />
-          </p>
-          <p className="ant-upload-text">
-            Haz clic o arrastra un archivo aquí
-          </p>
-          <p className="ant-upload-hint">
-            Soporta archivos PDF y DOCX (máx. 50MB)
-          </p>
-        </Dragger>
+        <div style={{ marginTop: 20 }}>
+          <Dragger {...uploadProps} height={150}>
+            <p className="ant-upload-drag-icon">
+              <InboxOutlined />
+            </p>
+            <p className="ant-upload-text">
+              Haz clic o arrastra archivos aquí
+            </p>
+            <p className="ant-upload-hint">
+              PDF, DOCX, Excel (Máx. 50MB c/u)
+            </p>
+          </Dragger>
+
+          {fileList.length > 0 && (
+            <div style={{ marginTop: 24, textAlign: 'center' }}>
+              <div style={{ marginBottom: 16 }}>
+                <Text type="secondary">
+                  {fileList.length} archivo(s) seleccionado(s)
+                </Text>
+              </div>
+              <button
+                onClick={handleUpload}
+                style={{
+                  backgroundColor: '#1890ff',
+                  color: 'white',
+                  border: 'none',
+                  padding: '10px 30px',
+                  borderRadius: '6px',
+                  fontSize: '16px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 12px rgba(24, 144, 255, 0.2)',
+                  transition: 'all 0.3s ease'
+                }}
+                onMouseOver={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+              >
+                Analizar Proyecto
+              </button>
+            </div>
+          )}
+        </div>
       );
     }
 
@@ -119,7 +154,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ open, onCancel, onSuccess }) 
           <Title level={4} style={{ color: '#ff4d4f' }}>Error al procesar</Title>
           <Text type="secondary">{errorMessage}</Text>
           <div style={{ marginTop: 24 }}>
-            <Text 
+            <Text
               style={{ color: '#1890ff', cursor: 'pointer' }}
               onClick={resetState}
             >
@@ -133,63 +168,48 @@ const UploadModal: React.FC<UploadModalProps> = ({ open, onCancel, onSuccess }) 
     // Estados de progreso
     return (
       <div style={{ padding: '20px 0' }}>
-        <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <Text strong style={{ fontSize: 16 }}>{fileName}</Text>
-        </div>
-        
         <Steps
           current={getCurrentStep()}
           items={[
             {
               title: 'Subiendo',
+              description: 'Cargando archivos...',
               icon: step === 'uploading' ? <LoadingOutlined /> : <CloudUploadOutlined />,
             },
             {
-              title: 'Analizando con IA',
+              title: 'Analizando',
+              description: 'IA procesando contexto...',
               icon: step === 'analyzing' ? <LoadingOutlined /> : <FileSearchOutlined />,
             },
             {
-              title: 'Completado',
+              title: 'Listo',
               icon: <CheckCircleOutlined />,
             },
           ]}
         />
-        
-        <div style={{ textAlign: 'center', marginTop: 32 }}>
+
+        <div style={{ textAlign: 'center', marginTop: 40, minHeight: 100 }}>
           {step === 'uploading' && (
-            <>
-              <Spin size="large" />
-              <div style={{ marginTop: 16 }}>
-                <Text type="secondary">Subiendo archivo...</Text>
-              </div>
-            </>
+            <div className="fade-in">
+              <Text strong style={{ fontSize: 16 }}>Subiendo {fileList.length} archivos...</Text>
+            </div>
           )}
-          
+
           {step === 'analyzing' && (
-            <>
-              <Spin 
-                size="large" 
-                indicator={<LoadingOutlined style={{ fontSize: 48 }} spin />} 
-              />
-              <div style={{ marginTop: 16 }}>
-                <Text type="secondary">
-                  Analizando documento con Gemini...
-                </Text>
-                <br />
-                <Text type="secondary" style={{ fontSize: 12 }}>
-                  Esto puede tomar entre 30 segundos y 2 minutos
-                </Text>
-              </div>
-            </>
+            <div className="fade-in">
+              <Text strong style={{ fontSize: 16, display: 'block', marginBottom: 8 }}>
+                Analizando Proyecto
+              </Text>
+              <Text type="secondary">
+                La IA está leyendo los PDFs y cruzando datos con los Excels...
+              </Text>
+            </div>
           )}
-          
+
           {step === 'complete' && (
-            <>
-              <CheckCircleOutlined style={{ fontSize: 48, color: '#52c41a' }} />
-              <div style={{ marginTop: 16 }}>
-                <Text type="success" strong>¡Análisis completado!</Text>
-              </div>
-            </>
+            <div className="fade-in">
+              <Text type="success" strong style={{ fontSize: 18 }}>¡Proyecto procesado!</Text>
+            </div>
           )}
         </div>
       </div>
@@ -198,11 +218,11 @@ const UploadModal: React.FC<UploadModalProps> = ({ open, onCancel, onSuccess }) 
 
   return (
     <Modal
-      title="Subir RFP"
+      title="Nuevo Proyecto"
       open={open}
       onCancel={handleCancel}
       footer={null}
-      width={500}
+      width={600}
       closable={step === 'idle' || step === 'error' || step === 'complete'}
       maskClosable={step === 'idle' || step === 'error'}
     >

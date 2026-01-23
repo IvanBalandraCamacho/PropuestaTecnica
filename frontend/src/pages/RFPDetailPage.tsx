@@ -19,6 +19,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { rfpApi } from '../lib/api';
 import AppLayout from '../components/layout/AppLayout';
 import { TeamEstimationView, CostEstimationView, SuggestedTeamView } from '../components/rfp';
+import { CitationViewer } from '../components/common/CitationViewer';
 import type { RFPStatus, Recommendation, RFPUpdate } from '../types';
 import dayjs from 'dayjs';
 
@@ -365,14 +366,7 @@ const RFPDetailPage: React.FC = () => {
                       {rfp.proposal_deadline ? dayjs(rfp.proposal_deadline).format('DD/MM/YYYY') : '-'}
                     </Descriptions.Item>
                     <Descriptions.Item label={<><ClockCircleOutlined style={{ marginRight: 4 }} /> Duración Proyecto</>}>
-                      {(() => {
-                        const { display, tooltip } = formatDuration(rfp.project_duration);
-                        return tooltip ? (
-                          <Tooltip title={tooltip}>
-                            <span style={{ cursor: 'help', borderBottom: '1px dashed #999' }}>{display}</span>
-                          </Tooltip>
-                        ) : display;
-                      })()}
+                      <CitationViewer text={rfp.project_duration || '-'} files={rfp.files} />
                     </Descriptions.Item>
                     <Descriptions.Item label={<><RobotOutlined style={{ marginRight: 4 }} /> Confianza IA</>}>
                       {rfp.confidence_score ? `${rfp.confidence_score}%` : '-'}
@@ -400,11 +394,11 @@ const RFPDetailPage: React.FC = () => {
                     <Col span={12}>
                       <Form.Item label="Categoría" name="category">
                         <Select placeholder="Seleccione categoría">
-                          <Select.Option value="mantencion_aplicaciones">Mantención Aplicaciones</Select.Option>
                           <Select.Option value="desarrollo_software">Desarrollo Software</Select.Option>
-                          <Select.Option value="analitica">Analítica</Select.Option>
-                          <Select.Option value="ia_chatbot">IA Chatbot</Select.Option>
-                          <Select.Option value="ia_documentos">IA Documentos</Select.Option>
+                          <Select.Option value="mantencion_aplicaciones">Mantención App</Select.Option>
+                          <Select.Option value="analitica">Analítica y Datos</Select.Option>
+                          <Select.Option value="ia_chatbot">IA & Chatbots</Select.Option>
+                          <Select.Option value="ia_documentos">IA Documental</Select.Option>
                           <Select.Option value="ia_video">IA Video</Select.Option>
                           <Select.Option value="otro">Otro</Select.Option>
                         </Select>
@@ -417,7 +411,7 @@ const RFPDetailPage: React.FC = () => {
                         rules={[{ validator: validateTVT }]}
                         tooltip="Solo números. Puede iniciar con 0."
                       >
-                        <Input placeholder="Ej: 0123456" />
+                        <Input placeholder="Ej: 15.000 (sin puntos)" />
                       </Form.Item>
                     </Col>
                     <Col span={8}>
@@ -425,7 +419,7 @@ const RFPDetailPage: React.FC = () => {
                         <InputNumber
                           style={{ width: '100%' }}
                           placeholder="Mínimo"
-                          formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                          formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={value => value!.replace(/\$\s?|(,*)/g, '')}
                         />
                       </Form.Item>
                     </Col>
@@ -434,7 +428,7 @@ const RFPDetailPage: React.FC = () => {
                         <InputNumber
                           style={{ width: '100%' }}
                           placeholder="Máximo"
-                          formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
+                          formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={value => value!.replace(/\$\s?|(,*)/g, '')}
                         />
                       </Form.Item>
                     </Col>
@@ -443,7 +437,7 @@ const RFPDetailPage: React.FC = () => {
                         <Select placeholder="Moneda">
                           <Select.Option value="USD">USD</Select.Option>
                           <Select.Option value="CLP">CLP</Select.Option>
-                          <Select.Option value="EUR">EUR</Select.Option>
+                          <Select.Option value="UF">UF</Select.Option>
                           <Select.Option value="BRL">BRL</Select.Option>
                           <Select.Option value="MXN">MXN</Select.Option>
                         </Select>
@@ -467,7 +461,15 @@ const RFPDetailPage: React.FC = () => {
                 <>
                   <Divider />
                   <Title level={5}>Resumen</Title>
-                  <Paragraph>{rfp.summary}</Paragraph>
+                  <Paragraph><CitationViewer text={rfp.summary} files={rfp.files} /></Paragraph>
+                </>
+              )}
+
+              {extracted?.budget?.notes && (
+                <>
+                  <Divider />
+                  <Title level={5}>Notas de Presupuesto</Title>
+                  <Paragraph><CitationViewer text={extracted.budget.notes} files={rfp.files} /></Paragraph>
                 </>
               )}
             </Card>
@@ -477,7 +479,7 @@ const RFPDetailPage: React.FC = () => {
               <Card title={<><CodeOutlined /> Stack Tecnológico</>} style={{ marginBottom: 24 }}>
                 <Space wrap>
                   {extracted.tech_stack.map((tech, i) => (
-                    <Tag key={i} color="blue">{tech}</Tag>
+                    <Tag key={i} color="blue"><CitationViewer text={tech} files={rfp.files} /></Tag>
                   ))}
                 </Space>
               </Card>
@@ -522,7 +524,9 @@ const RFPDetailPage: React.FC = () => {
           </Col>
 
           {/* Sidebar */}
-          < Col span={8} >
+          <Col span={8}>
+
+
             {/* Recommendation Reasons */}
             {extracted?.recommendation_reasons && extracted.recommendation_reasons.length > 0 && (
               <Card title="Razones de la Recomendación" style={{ marginBottom: 24 }}>
@@ -531,7 +535,7 @@ const RFPDetailPage: React.FC = () => {
                   dataSource={extracted.recommendation_reasons}
                   renderItem={(reason) => (
                     <List.Item>
-                      <Text>{reason}</Text>
+                      <CitationViewer text={reason} files={rfp.files} />
                     </List.Item>
                   )}
                 />
@@ -548,7 +552,7 @@ const RFPDetailPage: React.FC = () => {
                     renderItem={(sla) => (
                       <List.Item>
                         <Space direction="vertical" size={0}>
-                          <Text strong>{sla.description}</Text>
+                          <div><CitationViewer text={sla.description} files={rfp.files} /></div>
                           {sla.metric && <Text type="secondary">{sla.metric}</Text>}
                           {sla.is_aggressive && <Tag color="red">Agresivo</Tag>}
                         </Space>
@@ -569,7 +573,7 @@ const RFPDetailPage: React.FC = () => {
                     renderItem={(penalty) => (
                       <List.Item>
                         <Space direction="vertical" size={0}>
-                          <Text strong>{penalty.description}</Text>
+                          <div><CitationViewer text={penalty.description} files={rfp.files} /></div>
                           {penalty.amount && <Text type="secondary">{penalty.amount}</Text>}
                           {penalty.is_high && <Tag color="red">Alta</Tag>}
                         </Space>
@@ -616,6 +620,7 @@ const RFPDetailPage: React.FC = () => {
         <TeamEstimationView
           teamEstimation={teamData?.team_estimation || null}
           loading={teamDataLoading}
+          files={rfp.files}
         />
       ),
     },
