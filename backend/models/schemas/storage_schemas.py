@@ -22,6 +22,9 @@ class CarpetaSchema(BaseModel):
     url: Optional[str] = None
     creado: Optional[datetime] = None
     habilitado: bool
+    parent_id: Optional[UUID] = None
+    client_name: Optional[str] = None  # Para TVTs
+    version_count: Optional[int] = 0   # Para TVTs
     # To avoid recursion issues with children, handled in detail view
 
     class Config:

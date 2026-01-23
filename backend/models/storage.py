@@ -21,10 +21,7 @@ class Carpeta(Base):
         default=uuid.uuid4
     )
     
-    codigo: Mapped[str | None] = mapped_column(String(40), nullable=True)
     nombre: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    prefijo: Mapped[str | None] = mapped_column(String(5), nullable=True)  # e.g., "go", "no-go"
-    referencia_codigo: Mapped[str | None] = mapped_column(String(40), nullable=True)
     url: Mapped[str | None] = mapped_column(Text, nullable=True)
     
     creado: Mapped[datetime] = mapped_column(
