@@ -208,6 +208,7 @@ class RiskItem(BaseModel):
     category: str
     description: str
     severity: str = "medium"  # low, medium, high, critical
+    reference_document: str | None = None  # Pagina, seccion, etc.
 
 
 

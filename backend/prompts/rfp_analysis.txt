@@ -211,8 +211,8 @@ Responde SOLO con un JSON valido (sin markdown, sin explicaciones) con este form
   ],
   
   "risks": [
-    {"category": "budget", "description": "Presupuesto insuficiente para equipo requerido", "severity": "high"},
-    {"category": "timeline", "description": "Plazo ajustado", "severity": "medium"}
+    {"category": "budget", "description": "Presupuesto insuficiente para equipo requerido", "severity": "high", "reference_document": "Pag 12, Seccion 4.1"},
+    {"category": "timeline", "description": "Plazo ajustado", "severity": "medium", "reference_document": "Pag 8, Cronograma"}
   ],
   
   "recommendation": "strong_go | go | conditional_go | no_go | strong_no_go",
