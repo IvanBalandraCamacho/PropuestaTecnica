@@ -4,6 +4,7 @@ Endpoints para la gestión de Storage (Carpetas y Archivos estructurados).
 import uuid
 import logging
 import base64
+from datetime import datetime
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse, FileResponse
@@ -353,13 +354,21 @@ async def delete_folder(
 @router.get("/folders/{folder_id}", response_model=FolderContentSchema)
 async def get_folder_content(
     folder_id: uuid.UUID,
+    search: str | None = None,
+    start_date: datetime | None = None,
+    end_date: datetime | None = None,
+    min_proposals: int | None = None,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
     Obtiene el contenido de una carpeta (info, subcarpetas, archivos).
+    Permite filtrar subcarpetas por:
+    - search: Nombre de carpeta o Cliente (TVT)
+    - start_date, end_date: Rango de fecha de creación
+    - min_proposals: Cantidad mínima de versiones/propuestas (solo para carpetas GO)
     """
-    # 1. Obtener la carpeta
+    # 1. Obtener la carpeta principal
     result = await db.execute(select(Carpeta).where(Carpeta.carpeta_id == folder_id))
     folder = result.scalar_one_or_none()
     
@@ -368,7 +377,7 @@ async def get_folder_content(
 
     # 2. Obtener subcarpetas
     from models.rfp import RFPSubmission
-    from sqlalchemy import func
+    from sqlalchemy import func, or_, and_
     from sqlalchemy.orm import aliased
     
     CarpetaHija = aliased(Carpeta) # Proposals
@@ -398,13 +407,39 @@ async def get_folder_content(
         )
     )
     
+    # --- FILTROS ---
+    if search:
+        search_filter = f"%{search}%"
+        sub_query = sub_query.where(
+            or_(
+                Carpeta.nombre.ilike(search_filter),
+                RFPSubmission.client_name.ilike(search_filter)
+            )
+        )
+    
+    if start_date:
+        sub_query = sub_query.where(Carpeta.creado >= start_date)
+        
+    if end_date:
+        # Ajustar end_date para incluir todo el dia (si viene solo fecha, o asumir usuario envia timestamp)
+        # Assuming frontend sends simplified date, we might want to ensure coverage, but usually exact match logic applies
+        sub_query = sub_query.where(Carpeta.creado <= end_date)
+    
+    
     sub_result = await db.execute(sub_query)
     
     subfolders_data = []
     for row in sub_result.all():
         f = row[0]
+        # Asegurarse de que f es una instancia válida y no hay conflictos de sesión
         f.client_name = row[1]
         f.version_count = row[2] or 0
+        
+        # Filtro post-query para min_proposals (ya que version_count es subquery escalar)
+        if min_proposals is not None:
+             if f.version_count < min_proposals:
+                 continue
+
         subfolders_data.append(f)
     
     subfolders = subfolders_data

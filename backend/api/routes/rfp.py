@@ -418,6 +418,9 @@ async def make_decision(
             rfp.extracted_data
         )
     
+    if decision.decision == "no_go" and rfp.extracted_data:
+        await crear_carpetas_no_go(db, rfp, current_user.id)
+    
     await db.commit()
     await db.refresh(rfp)
     
@@ -448,8 +451,28 @@ async def crear_carpetas_go(db: AsyncSession, rfp: RFPSubmission, user_id: UUID)
         url=rfp.file_gcs_path
     )
 
+async def crear_carpetas_no_go(db: AsyncSession, rfp: RFPSubmission, user_id: UUID):
+    
+    if not rfp.tvt:
+        raise HTTPException( status_code=404, detail="TVT no encontrado")
 
+    carpeta_no_go = await get_user_folder(db, user_id, Constantes.Storage.NO_GO)
 
+    if not carpeta_no_go:
+        raise HTTPException( status_code=404, detail="Carpeta NO GO no encontrada")
+
+    carpeta_tvt = await create_folder(
+        db=db,
+        name=rfp.tvt, 
+        parent_id=carpeta_no_go.carpeta_id
+    )
+
+    await create_file(
+        db=db,
+        name=rfp.file_gcs_path.rsplit("/", 1)[-1], 
+        carpeta_id=carpeta_tvt.carpeta_id, 
+        url=rfp.file_gcs_path
+    )
 
 async def generate_questions_task(rfp_id: str, extracted_data: dict):
     """Task en background para generar preguntas."""

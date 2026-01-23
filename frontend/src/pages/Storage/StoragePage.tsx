@@ -9,7 +9,12 @@ import {
     Spin,
     Empty,
     message,
-    Space
+    Space,
+    DatePicker,
+    Input,
+    InputNumber,
+    Row,
+    Col
 } from 'antd';
 import {
     FolderOpenOutlined,
@@ -41,18 +46,38 @@ const StoragePage: React.FC = () => {
 
     const [searchParams, setSearchParams] = useSearchParams();
     const folderId = searchParams.get('folderId');
-    // const navigate = useNavigate(); // Remove unused
+
+    // Filters state
+    const [appliedSearch, setAppliedSearch] = useState('');
+    const [dateRange, setDateRange] = useState<any>(null);
+    const [minProposals, setMinProposals] = useState<number | null>(null);
+
+    useEffect(() => {
+        // Reset filters when changing folder
+        setAppliedSearch('');
+        setDateRange(null);
+        setMinProposals(null);
+    }, [folderId]);
 
     useEffect(() => {
         loadContent(folderId);
-    }, [folderId]);
+    }, [folderId, appliedSearch, dateRange, minProposals]);
 
     const loadContent = async (id: string | null) => {
         setLoading(true);
         try {
             if (id) {
+                // Prepare filters
+                const filters: any = {};
+                if (appliedSearch) filters.search = appliedSearch;
+                if (dateRange) {
+                    filters.start_date = dateRange[0].toISOString();
+                    filters.end_date = dateRange[1].toISOString();
+                }
+                if (minProposals !== null) filters.min_proposals = minProposals;
+
                 // Cargar contenido de una carpeta específica
-                const data = await storageService.getFolderContent(id);
+                const data = await storageService.getFolderContent(id, filters);
                 setCurrentFolder(data.carpeta);
                 setSubfolders(data.subcarpetas);
                 setFiles(data.archivos);
@@ -158,6 +183,64 @@ const StoragePage: React.FC = () => {
                         ]}
                     />
                 </div>
+
+                {/* Filters Section (Only inside GO or NO_GO folders) */}
+                {currentFolder && ['go', 'no_go', 'no go'].includes((currentFolder.nombre || '').toLowerCase()) && (
+                    <Card style={{ marginBottom: 24 }} bodyStyle={{ padding: '16px' }}>
+                        <Row gutter={[16, 16]} align="middle">
+                            <Col xs={24} sm={8} md={8}>
+                                <Input.Search
+                                    placeholder="Buscar proyecto o cliente..."
+                                    onSearch={val => setAppliedSearch(val)}
+                                    allowClear
+                                    enterButton
+                                />
+                            </Col>
+                            <Col xs={24} sm={8} md={8}>
+                                <DatePicker.RangePicker
+                                    style={{ width: '100%' }}
+                                    onChange={val => setDateRange(val)}
+                                    format="DD/MM/YYYY"
+                                />
+                            </Col>
+                            {currentFolder.nombre?.toLowerCase() === 'go' && (
+                                <Col xs={24} sm={6} md={6}>
+                                    <Space>
+                                        <Text type="secondary">Mín. Propuestas:</Text>
+                                        <div style={{ display: 'inline-block' }}>
+                                            <InputNumber
+                                                min={0}
+                                                placeholder="0"
+                                                onChange={(val) => setMinProposals(val ? Number(val) : null)}
+                                            />
+                                        </div>
+                                    </Space>
+                                </Col>
+                            )}
+                        </Row>
+                        {(appliedSearch || dateRange || minProposals) && (
+                            <div style={{ marginTop: 8 }}>
+                                <Text type="secondary" style={{ fontSize: '12px' }}>
+                                    Filtrando por:
+                                    {appliedSearch && <span style={{ marginLeft: 8 }}>Texto: "{appliedSearch}"</span>}
+                                    {dateRange && <span style={{ marginLeft: 8 }}>Fecha</span>}
+                                    {minProposals && <span style={{ marginLeft: 8 }}>Min. Prop: {minProposals}</span>}
+                                </Text>
+                                <Button
+                                    type="link"
+                                    size="small"
+                                    onClick={() => {
+                                        setAppliedSearch('');
+                                        setDateRange(null);
+                                        setMinProposals(null);
+                                    }}
+                                >
+                                    Limpiar
+                                </Button>
+                            </div>
+                        )}
+                    </Card>
+                )}
 
                 {/* Action Bar (Back button mainly) */}
                 {currentFolder && currentFolder.parent_id && (
