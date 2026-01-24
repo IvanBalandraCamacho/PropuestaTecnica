@@ -94,6 +94,15 @@ export interface RFPDetail extends RFPSummary {
     decided_at: string | null;
     updated_at: string;
     questions: RFPQuestion[];
+    files: RFPFile[];
+}
+
+export interface RFPFile {
+    id: string;
+    filename: string;
+    file_type: string;
+    file_size_bytes: number;
+    created_at: string;
 }
 
 export interface ExtractedRFPData {

@@ -46,120 +46,133 @@ router = APIRouter(prefix="/rfp", tags=["RFP"])
 
 @router.post("/upload", response_model=UploadResponse)
 async def upload_rfp(
-    file: UploadFile = File(...),
+    files: list[UploadFile] = File(...),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Sube un archivo RFP y realiza el análisis con Gemini.
+    Sube múltiples archivos para un proyecto RFP y realiza el análisis estructurado.
     
-    - Acepta PDF y DOCX
-    - Guarda localmente (o GCS si está disponible)
-    - Realiza análisis SÍNCRONO (espera a que termine)
-    - Retorna cuando el análisis está completo
+    - Acepta múltiples PDF, DOCX, XLSX
+    - Ingesta "Premium" (Excel estructurado)
+    - Análisis contextual cruzado (PDF vs Excel)
     """
-    # Validar tipo de archivo
+    if not files:
+        raise HTTPException(status_code=400, detail="No se enviaron archivos")
+
     allowed_types = [
         "application/pdf", 
-        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.ms-excel"
     ]
-    if file.content_type not in allowed_types:
-        raise HTTPException(
-            status_code=400,
-            detail="Tipo de archivo no soportado. Permitidos: PDF, DOCX"
-        )
     
-    # Leer contenido
-    content = await file.read()
-    file_size = len(content)
+    # Validar tipos
+    for file in files:
+        if file.content_type not in allowed_types:
+            logger.warning(f"File type warning: {file.filename} ({file.content_type}). Processing anyway.")
+
+    # 1. Crear Submission (Contenedor del Proyecto)
+    # Usamos el nombre del primer archivo como nombre del proyecto por defecto
+    project_name = files[0].filename
     
-    # Obtener nombre de archivo
-    filename = file.filename or "documento_sin_nombre.pdf"
-    content_type = file.content_type or "application/pdf"
-    
-    # Guardar en storage (híbrido: GCS o local)
-    storage = get_storage_service()
-    file_uri = storage.upload_file(
-        file_content=content,
-        file_name=filename,
-        content_type=content_type,
-    )
-    
-    # Crear registro en BD
     rfp = RFPSubmission(
-        file_name=filename,
-        file_gcs_path=file_uri,
-        file_size_bytes=file_size,
-        status=RFPStatus.ANALYZING.value,  # Directamente analyzing
+        file_name=project_name, # Legacy comp. -> Nombre del proyecto
+        file_gcs_path="multi_file_project", # Placeholder para legacy
+        file_size_bytes=0,
+        status=RFPStatus.ANALYZING.value,
+        client_name="Detecting...", 
     )
     db.add(rfp)
     await db.commit()
     await db.refresh(rfp)
     
-    # Obtener modo de análisis de las preferencias del usuario
-    user_prefs = current_user.preferences or {}
-    analysis_mode = user_prefs.get("analysis_mode", "balanced")
-    logger.info(f"Using analysis mode: {analysis_mode} (from user preferences)")
+    storage = get_storage_service()
+    analyzer = get_analyzer_service()
     
-    # Realizar análisis SÍNCRONO
+    files_data_for_analysis = []
+    
     try:
-        analyzer = get_analyzer_service()
-        extracted_data = await analyzer.analyze_rfp_from_content(
-            content, 
-            filename,
+        total_size = 0
+        
+        # 2. Procesar y Guardar cada archivo
+        from models.rfp import RFPFile
+        
+        for file in files:
+            content = await file.read()
+            size = len(content)
+            total_size += size
+            
+            # Guardar en Storage
+            file_uri = storage.upload_file(
+                file_content=content,
+                file_name=file.filename,
+                content_type=file.content_type or "application/octet-stream",
+            )
+            
+            # Crear registro RFPFile
+            rfp_file = RFPFile(
+                rfp_id=rfp.id,
+                filename=file.filename,
+                file_gcs_path=file_uri,
+                file_size_bytes=size,
+                file_type=file.filename.split(".")[-1].lower(),
+            )
+            db.add(rfp_file)
+            
+            # Preparar para análisis
+            files_data_for_analysis.append({
+                "content": content,
+                "filename": file.filename,
+                "type": rfp_file.file_type
+            })
+            
+        # Actualizar submission con tamaño total
+        rfp.file_size_bytes = total_size
+        await db.commit()
+        
+        # 3. Análisis Multi-Archivo (Síncrono por ahora, idealmente background)
+        # Obtener modo de análisis
+        user_prefs = current_user.preferences or {}
+        analysis_mode = user_prefs.get("analysis_mode", "balanced")
+        
+        extracted_data = await analyzer.analyze_rfp_project(
+            files=files_data_for_analysis,
             analysis_mode=analysis_mode,
-            db=db,
+            db=db
         )
         
-        # Extraer campos indexados
+        # 4. Actualizar Submission con resultados
         indexed_fields = analyzer.extract_indexed_fields(extracted_data)
         
-        # Actualizar RFP con resultados
         rfp.extracted_data = extracted_data
         rfp.status = RFPStatus.ANALYZED.value
         rfp.analyzed_at = datetime.utcnow()
         
         for field, value in indexed_fields.items():
             setattr(rfp, field, value)
-        
-        # Guardar recommended_isos en su columna específica
+            
         if "recommended_isos" in extracted_data:
             rfp.recommended_isos = extracted_data["recommended_isos"]
-        
+            
         await db.commit()
         await db.refresh(rfp)
         
-        logger.info(f"RFP analysis completed: {rfp.id}")
-        
         return UploadResponse(
             id=rfp.id,
-            file_name=filename,
+            file_name=project_name,
             status=RFPStatus.ANALYZED.value,
-            message="RFP subido y analizado exitosamente.",
+            message=f"Proyecto analizado exitosamente ({len(files)} archivos).",
         )
-        
+
     except Exception as e:
-        logger.error(f"Error analyzing RFP {rfp.id}: {e}")
+        logger.error(f"Error analyzing RFP Project {rfp.id}: {e}", exc_info=True)
         try:
-            # Primero Rollback de la transacción fallida anterior
-            await db.rollback()
-            
-            # Usar execute+select en lugar de get para evitar problemas de identidad en la sesión tras rollback
-            result = await db.execute(select(RFPSubmission).where(RFPSubmission.id == rfp.id))
-            rfp_db = result.scalar_one_or_none()
-            
-            if rfp_db:
-                rfp_db.status = RFPStatus.ERROR.value
-                await db.commit()
-                logger.info(f"RFP {rfp.id} marked as ERROR")
-                
-        except Exception as db_e:
-            logger.error(f"Failed to update RFP status to ERROR: {db_e}")
-        
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error al analizar el RFP: {str(e)}"
-        )
+            rfp.status = RFPStatus.ERROR.value
+            await db.commit()
+        except:
+            pass
+        raise HTTPException(status_code=500, detail=f"Error en análisis: {str(e)}")
 
 
 async def analyze_rfp_task(rfp_id: str, file_uri: str, file_content: bytes):
@@ -321,7 +334,10 @@ async def get_rfp(
     """
     result = await db.execute(
         select(RFPSubmission)
-        .options(selectinload(RFPSubmission.questions))
+        .options(
+            selectinload(RFPSubmission.questions),
+            selectinload(RFPSubmission.files)
+        )
         .where(RFPSubmission.id == rfp_id)
     )
     rfp = result.scalar_one_or_none()

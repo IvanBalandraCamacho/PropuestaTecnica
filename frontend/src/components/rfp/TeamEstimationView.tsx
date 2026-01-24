@@ -4,7 +4,8 @@
 import React, { useState } from 'react';
 import { Table, Tag, Space, Typography, Tooltip, Empty, Card, Statistic, Row, Col, InputNumber } from 'antd';
 import { TeamOutlined } from '@ant-design/icons';
-import type { TeamEstimation, RoleEstimation, Seniority } from '../../types';
+import { CitationViewer } from '../common/CitationViewer';
+import type { TeamEstimation, RoleEstimation, Seniority, RFPFile } from '../../types';
 import type { ColumnsType } from 'antd/es/table';
 
 const { Text, Paragraph } = Typography;
@@ -12,6 +13,7 @@ const { Text, Paragraph } = Typography;
 interface TeamEstimationViewProps {
   teamEstimation: TeamEstimation | null;
   loading?: boolean;
+  files: RFPFile[] | undefined;
 }
 
 const seniorityColors: Record<Seniority, string> = {
@@ -28,7 +30,7 @@ const seniorityLabels: Record<Seniority, string> = {
   lead: 'Lead',
 };
 
-const TeamEstimationView: React.FC<TeamEstimationViewProps> = ({ teamEstimation, loading }) => {
+const TeamEstimationView: React.FC<TeamEstimationViewProps> = ({ teamEstimation, loading, files }) => {
   // Estado para manejar roles editables
   const [editableRoles, setEditableRoles] = useState<RoleEstimation[]>(
     teamEstimation?.roles || []
@@ -76,11 +78,9 @@ const TeamEstimationView: React.FC<TeamEstimationViewProps> = ({ teamEstimation,
         <Space direction="vertical" size={0}>
           <Text strong>{title}</Text>
           {record.justification && (
-            <Tooltip title={record.justification}>
-              <Text type="secondary" style={{ fontSize: 12 }}>
-                Ver justificación
-              </Text>
-            </Tooltip>
+            <div style={{ fontSize: 12 }}>
+              <CitationViewer text={record.justification} files={files} />
+            </div>
           )}
         </Space>
       ),
@@ -292,7 +292,9 @@ const TeamEstimationView: React.FC<TeamEstimationViewProps> = ({ teamEstimation,
       {/* Rationale */}
       {teamEstimation.rationale && (
         <Card size="small" title="Justificación de la Estimación">
-          <Paragraph>{teamEstimation.rationale}</Paragraph>
+          <Paragraph>
+            <CitationViewer text={teamEstimation.rationale} files={files} />
+          </Paragraph>
         </Card>
       )}
     </Space>

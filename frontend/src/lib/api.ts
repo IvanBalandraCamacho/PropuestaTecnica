@@ -142,9 +142,9 @@ export const rfpApi = {
     return data;
   },
 
-  upload: async (file: File): Promise<UploadResponse> => {
+  upload: async (files: File[]): Promise<UploadResponse> => {
     const formData = new FormData();
-    formData.append('file', file);
+    files.forEach(file => formData.append('files', file));
 
     const { data } = await api.post<UploadResponse>('/rfp/upload', formData);
     return data;
