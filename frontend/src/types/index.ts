@@ -143,6 +143,7 @@ export interface ExtractedRFPData {
         category: string;
         description: string;
         severity: 'low' | 'medium' | 'high' | 'critical';
+        reference_document?: string;
     }>;
     recommendation: Recommendation | null;
     recommendation_reasons: string[];

@@ -512,7 +512,18 @@ const RFPDetailPage: React.FC = () => {
                               {severityLabels[risk.severity] || risk.severity.toUpperCase()}
                             </Tag>
                           }
-                          title={risk.category.replace(/_/g, ' ').toUpperCase()}
+                          title={
+                            <Space align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
+                              <Text strong>{risk.category.replace(/_/g, ' ').toUpperCase()}</Text>
+                              {risk.reference_document && (
+                                <Tooltip title="Referencia en el documento original">
+                                  <Tag icon={<FileTextOutlined />} color="default">
+                                    {risk.reference_document}
+                                  </Tag>
+                                </Tooltip>
+                              )}
+                            </Space>
+                          }
                           description={risk.description}
                         />
                       </List.Item>
