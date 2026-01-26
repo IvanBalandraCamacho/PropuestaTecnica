@@ -30,9 +30,9 @@ import {
 import { storageService } from '../../services/storageService';
 import type { Carpeta, Archivo } from '../../services/storageService';
 import AppLayout from '../../components/layout/AppLayout';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import dayjs from 'dayjs';
-import FilePreviewModal from '../../components/common/FilePreviewModal';
+
 
 const { Content } = Layout;
 const { Title, Text } = Typography;
