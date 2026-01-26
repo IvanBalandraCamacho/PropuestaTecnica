@@ -4,26 +4,31 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
-  Layout, Typography, Card, Descriptions, Tag, Button, Space,
-  Spin, Modal, Input, message, Row, Col, Alert, Divider, List, Tabs,
-  Form, Select, DatePicker, InputNumber, Tooltip
+  Layout, Typography, Button, Space,
+  Spin, Modal, Input, message, Tag, Tabs,
+  Form
 } from 'antd';
 import {
   ArrowLeftOutlined, CheckOutlined, CloseOutlined,
-  ExclamationCircleOutlined, CalendarOutlined, DollarOutlined,
-  GlobalOutlined, CodeOutlined, TeamOutlined, SearchOutlined, ReloadOutlined,
-  EditOutlined, SaveOutlined, CloseCircleOutlined, NumberOutlined, AppstoreOutlined,
-  ClockCircleOutlined, RobotOutlined, FileTextOutlined, InfoCircleOutlined
+  GlobalOutlined, DollarOutlined,
+  TeamOutlined, SearchOutlined, ReloadOutlined,
+  BarChartOutlined, MessageOutlined
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { rfpApi } from '../lib/api';
 import AppLayout from '../components/layout/AppLayout';
-import { TeamEstimationView, CostEstimationView, SuggestedTeamView } from '../components/rfp';
-import { CitationViewer } from '../components/common/CitationViewer';
-import type { RFPStatus, Recommendation, RFPUpdate } from '../types';
+import {
+  TeamEstimationView,
+  CostEstimationView,
+  SuggestedTeamView,
+  RFPSummaryView,
+  RFPAnalysisView
+} from '../components/rfp';
+import ChatWidget from '../components/chat/ChatWidget';
+import type { RFPStatus, Recommendation, RFPUpdate, ChatMessage } from '../types';
 import dayjs from 'dayjs';
 
-const { Title, Text, Paragraph } = Typography;
+const { Title, Text } = Typography;
 const { Content } = Layout;
 const { TextArea } = Input;
 
@@ -70,6 +75,7 @@ const RFPDetailPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState('summary');
   const [isEditing, setIsEditing] = useState(false);
   const [pendingDecision, setPendingDecision] = useState<'go' | 'no_go' | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [form] = Form.useForm();
 
   // RFP data
@@ -216,23 +222,6 @@ const RFPDetailPage: React.FC = () => {
     }
   };
 
-  // Validar que TVT solo tenga números
-  const validateTVT = (_: unknown, value: string) => {
-    if (value && !/^\d*$/.test(value)) {
-      return Promise.reject('Solo se permiten números');
-    }
-    return Promise.resolve();
-  };
-
-  // Formatear categoría a título (Ej: desarrollo_software -> Desarrollo Software)
-  const formatCategory = (category: string | null | undefined): string => {
-    if (!category) return '-';
-    return category
-      .replace(/_/g, ' ')
-      .replace(/\b\w/g, (char) => char.toUpperCase());
-  };
-
-
 
   if (isLoading) {
     return (
@@ -248,13 +237,17 @@ const RFPDetailPage: React.FC = () => {
     return (
       <AppLayout>
         <Content style={{ padding: 24 }}>
-          <Alert type="error" message="RFP no encontrado" />
+          <Modal
+            open={true}
+            title="Error"
+            footer={[<Button key="back" onClick={() => navigate('/')}>Volver</Button>]}
+          >
+            RFP no encontrado
+          </Modal>
         </Content>
       </AppLayout>
     );
   }
-
-  const extracted = rfp.extracted_data;
 
   // Tab items configuration
   const tabItems = [
@@ -267,380 +260,26 @@ const RFPDetailPage: React.FC = () => {
         </span>
       ),
       children: (
-        <Row gutter={24}>
-          {/* Main Info */}
-          <Col span={16}>
-            <Card
-              title="Información del RFP"
-              style={{ marginBottom: 24 }}
-              extra={
-                !isEditing ? (
-                  <Button
-                    icon={<EditOutlined />}
-                    onClick={() => setIsEditing(true)}
-                  >
-                    Editar
-                  </Button>
-                ) : (
-                  <Space>
-                    <Button
-                      icon={<CloseCircleOutlined />}
-                      onClick={handleCancelEdit}
-                    >
-                      Cancelar
-                    </Button>
-                    <Button
-                      type="primary"
-                      icon={<SaveOutlined />}
-                      onClick={handleSaveEdit}
-                      loading={updateMutation.isPending}
-                    >
-                      Guardar
-                    </Button>
-                  </Space>
-                )
-              }
-            >
-              {!isEditing ? (
-                <>
-                  <Descriptions column={2}>
-                    <Descriptions.Item label={<><FileTextOutlined style={{ marginRight: 4 }} /> Nombre del Proyecto</>} span={2}>
-                      {rfp.title || '-'}
-                    </Descriptions.Item>
-                    <Descriptions.Item label={<><GlobalOutlined style={{ marginRight: 4 }} /> País</>}>
-                      {rfp.country || '-'}
-                    </Descriptions.Item>
-                    <Descriptions.Item label={<><AppstoreOutlined style={{ marginRight: 4 }} /> Categoría</>}>
-                      {formatCategory(rfp.category)}
-                    </Descriptions.Item>
-                    <Descriptions.Item label={<><NumberOutlined style={{ marginRight: 4 }} /> TVT</>}>
-                      {rfp.tvt || '-'}
-                    </Descriptions.Item>
-                    <Descriptions.Item label={<><DollarOutlined style={{ marginRight: 4 }} /> Presupuesto</>}>
-                      {rfp.budget_min || rfp.budget_max ? (
-                        `${rfp.currency} ${rfp.budget_min?.toLocaleString() || '?'} - ${rfp.budget_max?.toLocaleString() || '?'}`
-                      ) : '-'}
-                    </Descriptions.Item>
-                    <Descriptions.Item label={<><CalendarOutlined style={{ marginRight: 4 }} /> Deadline Propuesta</>}>
-                      {rfp.proposal_deadline ? dayjs(rfp.proposal_deadline).format('DD/MM/YYYY') : '-'}
-                    </Descriptions.Item>
-                    <Descriptions.Item label={<><ClockCircleOutlined style={{ marginRight: 4 }} /> Duración Proyecto</>}>
-                      <CitationViewer text={rfp.project_duration || '-'} files={rfp.files} />
-                    </Descriptions.Item>
-                    <Descriptions.Item label={<><RobotOutlined style={{ marginRight: 4 }} /> Confianza IA</>}>
-                      {rfp.confidence_score ? `${rfp.confidence_score}%` : '-'}
-                    </Descriptions.Item>
-                  </Descriptions>
-                </>
-              ) : (
-                <Form form={form} layout="vertical">
-                  <Row gutter={16}>
-                    <Col span={12}>
-                      <Form.Item label="Nombre del Proyecto" name="title">
-                        <Input placeholder="Nombre o título del proyecto" />
-                      </Form.Item>
-                    </Col>
-                    <Col span={12}>
-                      <Form.Item label="Cliente" name="client_name">
-                        <Input placeholder="Nombre del cliente" />
-                      </Form.Item>
-                    </Col>
-                    <Col span={12}>
-                      <Form.Item label="País" name="country">
-                        <Input placeholder="País" />
-                      </Form.Item>
-                    </Col>
-                    <Col span={12}>
-                      <Form.Item label="Categoría" name="category">
-                        <Select placeholder="Seleccione categoría">
-                          <Select.Option value="desarrollo_software">Desarrollo Software</Select.Option>
-                          <Select.Option value="mantencion_aplicaciones">Mantención App</Select.Option>
-                          <Select.Option value="analitica">Analítica y Datos</Select.Option>
-                          <Select.Option value="ia_chatbot">IA & Chatbots</Select.Option>
-                          <Select.Option value="ia_documentos">IA Documental</Select.Option>
-                          <Select.Option value="ia_video">IA Video</Select.Option>
-                          <Select.Option value="otro">Otro</Select.Option>
-                        </Select>
-                      </Form.Item>
-                    </Col>
-                    <Col span={12}>
-                      <Form.Item
-                        label="TVT"
-                        name="tvt"
-                        rules={[{ validator: validateTVT }]}
-                        tooltip="Solo números. Puede iniciar con 0."
-                      >
-                        <Input placeholder="Ej: 15.000 (sin puntos)" />
-                      </Form.Item>
-                    </Col>
-                    <Col span={8}>
-                      <Form.Item label="Presupuesto Mín" name="budget_min">
-                        <InputNumber
-                          style={{ width: '100%' }}
-                          placeholder="Mínimo"
-                          formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={value => value!.replace(/\$\s?|(,*)/g, '')}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col span={8}>
-                      <Form.Item label="Presupuesto Máx" name="budget_max">
-                        <InputNumber
-                          style={{ width: '100%' }}
-                          placeholder="Máximo"
-                          formatter={value => `$ ${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={value => value!.replace(/\$\s?|(,*)/g, '')}
-                        />
-                      </Form.Item>
-                    </Col>
-                    <Col span={8}>
-                      <Form.Item label="Moneda" name="currency">
-                        <Select placeholder="Moneda">
-                          <Select.Option value="USD">USD</Select.Option>
-                          <Select.Option value="CLP">CLP</Select.Option>
-                          <Select.Option value="UF">UF</Select.Option>
-                          <Select.Option value="BRL">BRL</Select.Option>
-                          <Select.Option value="MXN">MXN</Select.Option>
-                        </Select>
-                      </Form.Item>
-                    </Col>
-                    <Col span={12}>
-                      <Form.Item label="Deadline Propuesta" name="proposal_deadline">
-                        <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
-                      </Form.Item>
-                    </Col>
-                    <Col span={12}>
-                      <Form.Item label="Duración Proyecto" name="project_duration">
-                        <Input placeholder="Ej: 12 meses" />
-                      </Form.Item>
-                    </Col>
-                  </Row>
-                </Form>
-              )}
-
-              {rfp.summary && (
-                <>
-                  <Divider />
-                  <Title level={5}>Resumen</Title>
-                  <Paragraph><CitationViewer text={rfp.summary} files={rfp.files} /></Paragraph>
-                </>
-              )}
-
-              {extracted?.budget?.notes && (
-                <>
-                  <Divider />
-                  <Title level={5}>Notas de Presupuesto</Title>
-                  <Paragraph><CitationViewer text={extracted.budget.notes} files={rfp.files} /></Paragraph>
-                </>
-              )}
-            </Card>
-
-            {/* Tech Stack */}
-            {extracted?.tech_stack && extracted.tech_stack.length > 0 && (
-              <Card title={<><CodeOutlined /> Stack Tecnológico</>} style={{ marginBottom: 24 }}>
-                <Space wrap>
-                  {extracted.tech_stack.map((tech, i) => (
-                    <Tag key={i} color="blue"><CitationViewer text={tech} files={rfp.files} /></Tag>
-                  ))}
-                </Space>
-              </Card>
-            )}
-
-            {/* Risks */}
-            {extracted?.risks && extracted.risks.length > 0 && (
-              <Card
-                title={<><ExclamationCircleOutlined style={{ marginRight: 6 }} /> Riesgos Identificados</>}
-                style={{ marginBottom: 24 }}
-              >
-                <List
-                  dataSource={extracted.risks}
-                  renderItem={(risk) => {
-                    const severityLabels: Record<string, string> = {
-                      critical: 'CRÍTICO',
-                      high: 'ALTO',
-                      medium: 'MEDIO',
-                      low: 'BAJO'
-                    };
-                    return (
-                      <List.Item>
-                        <List.Item.Meta
-                          avatar={
-                            <Tag color={
-                              risk.severity === 'critical' ? 'red' :
-                                risk.severity === 'high' ? 'orange' :
-                                  risk.severity === 'medium' ? 'gold' : 'default'
-                            } style={{ minWidth: 70, textAlign: 'center' }}>
-                              {severityLabels[risk.severity] || risk.severity.toUpperCase()}
-                            </Tag>
-                          }
-                          title={
-                            <Space align="center" style={{ width: '100%', justifyContent: 'space-between' }}>
-                              <Text strong>{risk.category.replace(/_/g, ' ').toUpperCase()}</Text>
-                              {risk.reference_document && (
-                                <Tooltip title="Referencia en el documento original">
-                                  <Tag icon={<FileTextOutlined />} color="default">
-                                    {risk.reference_document}
-                                  </Tag>
-                                </Tooltip>
-                              )}
-                            </Space>
-                          }
-                          description={risk.description}
-                        />
-                      </List.Item>
-                    );
-                  }}
-                />
-              </Card>
-            )}
-          </Col>
-
-          {/* Sidebar */}
-          <Col span={8}>
-
-
-            {/* Recommendation Reasons */}
-            {extracted?.recommendation_reasons && extracted.recommendation_reasons.length > 0 && (
-              <Card title="Razones de la Recomendación" style={{ marginBottom: 24 }}>
-                <List
-                  size="small"
-                  dataSource={extracted.recommendation_reasons}
-                  renderItem={(reason) => (
-                    <List.Item>
-                      <CitationViewer text={reason} files={rfp.files} />
-                    </List.Item>
-                  )}
-                />
-              </Card>
-            )}
-
-            {/* SLAs */}
-            {
-              extracted?.sla && extracted.sla.length > 0 && (
-                <Card title="SLAs" style={{ marginBottom: 24 }}>
-                  <List
-                    size="small"
-                    dataSource={extracted.sla}
-                    renderItem={(sla) => (
-                      <List.Item>
-                        <Space direction="vertical" size={4} style={{ width: '100%' }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div style={{ flex: 1 }}>
-                              <CitationViewer text={sla.description} files={rfp.files} />
-                            </div>
-
-                            {/* Premium Reference UI - Minimal "Bolita" */}
-                            {sla.reference_document && (
-                              <Tooltip
-                                title={
-                                  <Space direction="vertical" size={0}>
-                                    <Text style={{ color: 'white', fontSize: 12 }}>Fuente detectada:</Text>
-                                    <Text style={{ color: 'white', fontWeight: 600 }}>{sla.reference_document}</Text>
-                                  </Space>
-                                }
-                                color="blue"
-                              >
-                                <div
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    width: 24,
-                                    height: 24,
-                                    borderRadius: '50%',
-                                    // Use standard colors or transparency
-                                    background: 'rgba(24, 144, 255, 0.15)',
-                                    color: '#1890ff',
-                                    cursor: 'pointer',
-                                    marginLeft: 12,
-                                    flexShrink: 0,
-                                    transition: 'all 0.3s ease'
-                                  }}
-                                  onMouseOver={(e) => {
-                                    e.currentTarget.style.background = '#1890ff';
-                                    e.currentTarget.style.color = '#fff';
-                                  }}
-                                  onMouseOut={(e) => {
-                                    e.currentTarget.style.background = 'rgba(24, 144, 255, 0.15)';
-                                    e.currentTarget.style.color = '#1890ff';
-                                  }}
-                                >
-                                  <InfoCircleOutlined style={{ fontSize: 14 }} />
-                                </div>
-                              </Tooltip>
-                            )}
-                          </div>
-
-                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                            {sla.source === 'detectado por ia' && (
-                              <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>
-                                <RobotOutlined style={{ marginRight: 4 }} /> IA
-                              </Tag>
-                            )}
-                            {sla.source === 'detectado en rfp' && (
-                              <Tag color="cyan" style={{ fontSize: 11, margin: 0 }}>
-                                <FileTextOutlined style={{ marginRight: 4 }} /> RFP
-                              </Tag>
-                            )}
-                            {sla.is_aggressive && (
-                              <Tag color="red" style={{ fontSize: 11, margin: 0 }}>Agresivo</Tag>
-                            )}
-                            {sla.metric && (
-                              <Text type="secondary" style={{ fontSize: 12 }}>
-                                | Métrica: {sla.metric}
-                              </Text>
-                            )}
-                          </div>
-                        </Space>
-                      </List.Item>
-                    )}
-                  />
-                </Card>
-              )
-            }
-
-            {/* Penalties */}
-            {
-              extracted?.penalties && extracted.penalties.length > 0 && (
-                <Card title="Penalidades" style={{ marginBottom: 24 }}>
-                  <List
-                    size="small"
-                    dataSource={extracted.penalties}
-                    renderItem={(penalty) => (
-                      <List.Item>
-                        <Space direction="vertical" size={0}>
-                          <div><CitationViewer text={penalty.description} files={rfp.files} /></div>
-                          {penalty.amount && <Text type="secondary">{penalty.amount}</Text>}
-                          {penalty.is_high && <Tag color="red">Alta</Tag>}
-                        </Space>
-                      </List.Item>
-                    )}
-                  />
-                </Card>
-              )
-            }
-
-            {/* Decision Info */}
-            {
-              rfp.decision && (
-                <Card title="Decisión Registrada">
-                  <Tag color={rfp.decision === 'go' ? 'success' : 'error'} style={{ fontSize: 16, padding: '4px 12px' }}>
-                    {rfp.decision.toUpperCase()}
-                  </Tag>
-                  {rfp.decision_reason && (
-                    <Paragraph style={{ marginTop: 12 }}>
-                      <Text strong>Razón:</Text> {rfp.decision_reason}
-                    </Paragraph>
-                  )}
-                  {rfp.decided_at && (
-                    <Text type="secondary">
-                      {dayjs(rfp.decided_at).format('DD/MM/YYYY HH:mm')}
-                    </Text>
-                  )}
-                </Card>
-              )
-            }
-          </Col >
-        </Row >
+        <RFPSummaryView
+          rfp={rfp}
+          isEditing={isEditing}
+          onEdit={() => setIsEditing(true)}
+          onCancel={handleCancelEdit}
+          onSave={handleSaveEdit}
+          form={form}
+          saving={updateMutation.isPending}
+        />
       ),
+    },
+    {
+      key: 'analysis',
+      label: (
+        <span>
+          <BarChartOutlined style={{ marginRight: 6 }} />
+          Análisis
+        </span>
+      ),
+      children: <RFPAnalysisView rfp={rfp} />,
     },
     {
       key: 'team',
@@ -674,6 +313,25 @@ const RFPDetailPage: React.FC = () => {
       ),
     },
     {
+      key: 'chat',
+      label: (
+        <span>
+          <MessageOutlined style={{ marginRight: 6 }} />
+          Chat
+        </span>
+      ),
+      children: (
+        <div className="content-panel" style={{ height: '600px', padding: 24 }}>
+          <ChatWidget
+            rfpId={id || null}
+            messages={chatMessages}
+            onAddMessage={(msg) => setChatMessages(prev => [...prev, msg])}
+            onClearMessages={() => setChatMessages([])}
+          />
+        </div>
+      )
+    },
+    {
       key: 'candidates',
       label: (
         <span>
@@ -684,7 +342,7 @@ const RFPDetailPage: React.FC = () => {
       children: (
         <Space direction="vertical" size="large" style={{ width: '100%' }}>
           {/* Search Candidates Button */}
-          <Card size="small">
+          <div className="content-panel" style={{ padding: 24 }}>
             <Space>
               <Button
                 type="primary"
@@ -710,7 +368,7 @@ const RFPDetailPage: React.FC = () => {
                 </Text>
               )}
             </Space>
-          </Card>
+          </div>
 
           <SuggestedTeamView
             suggestedTeam={teamData?.suggested_team || null}
@@ -723,94 +381,122 @@ const RFPDetailPage: React.FC = () => {
 
   return (
     <AppLayout>
-      <Content style={{ padding: 24 }}>
-        {/* Header */}
-        <div style={{ marginBottom: 24 }}>
-          <Button
-            icon={<ArrowLeftOutlined />}
-            onClick={() => navigate('/')}
-            style={{ marginBottom: 16 }}
-          >
-            Volver
-          </Button>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <div>
-              <Title level={2} style={{ margin: 0 }}>
-                {rfp.client_name || rfp.file_name}
-              </Title>
-              <Space style={{ marginTop: 8 }}>
-                <Tag color={statusColors[rfp.status]}>{statusLabels[rfp.status]}</Tag>
-                {rfp.recommendation && (
-                  <Tag color={recommendationColors[rfp.recommendation]}>
-                    IA: {recommendationLabels[rfp.recommendation]}
+      <Content style={{ padding: '0', minHeight: '100vh', background: 'var(--bg-primary)' }}>
+        <div style={{ padding: '32px' }}>
+          {/* Header */}
+          <div style={{ marginBottom: 32 }}>
+            <Button
+              type="text"
+              icon={<ArrowLeftOutlined />}
+              onClick={() => navigate('/')}
+              style={{ marginBottom: 16, color: 'var(--text-secondary)', paddingLeft: 0 }}
+            >
+              Volver al listado
+            </Button>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'flex-start',
+              background: 'var(--bg-card)',
+              padding: '24px',
+              borderRadius: '12px',
+              border: '1px solid var(--border-color)',
+            }}>
+              <div>
+                <Space align="center" style={{ marginBottom: 8 }}>
+                  <Tag color={statusColors[rfp.status]} style={{ border: 'none', padding: '4px 12px', fontSize: 12 }}>
+                    {statusLabels[rfp.status].toUpperCase()}
                   </Tag>
+                  {rfp.recommendation && (
+                    <Tag color={recommendationColors[rfp.recommendation]} style={{ border: 'none', padding: '4px 12px', fontSize: 12, fontWeight: 600 }}>
+                      IA: {recommendationLabels[rfp.recommendation]}
+                    </Tag>
+                  )}
+                </Space>
+                <Title level={2} style={{ margin: '8px 0', color: 'var(--text-primary)', letterSpacing: '-0.5px' }}>
+                  {rfp.client_name || rfp.file_name}
+                </Title>
+                <Text style={{ fontSize: 16, color: 'var(--text-secondary)' }}>
+                  {rfp.title}
+                </Text>
+              </div>
+
+              {/* Decision Buttons */}
+              <Space size="middle">
+                {rfp.status === 'analyzed' && !rfp.decision && (
+                  <>
+                    <Button
+                      type="primary"
+                      size="large"
+                      icon={<CheckOutlined />}
+                      onClick={handleGo}
+                      loading={decisionMutation.isPending && pendingDecision === 'go'}
+                      disabled={decisionMutation.isPending && pendingDecision === 'no_go'}
+                      style={{
+                        background: 'var(--color-success)',
+                        borderColor: 'var(--color-success)',
+                        height: 44,
+                        padding: '0 32px'
+                      }}
+                    >
+                      GO
+                    </Button>
+                    <Button
+                      danger
+                      size="large"
+                      icon={<CloseOutlined />}
+                      onClick={handleNoGo}
+                      loading={decisionMutation.isPending && pendingDecision === 'no_go'}
+                      disabled={decisionMutation.isPending && pendingDecision === 'go'}
+                      style={{ height: 44, padding: '0 32px' }}
+                    >
+                      NO GO
+                    </Button>
+                  </>
+                )}
+
+                {rfp.decision === 'go' && (
+                  <Button
+                    type="primary"
+                    size="large"
+                    onClick={() => navigate(`/rfp/${id}/questions`)}
+                    style={{ height: 44 }}
+                  >
+                    Ver Preguntas
+                  </Button>
                 )}
               </Space>
             </div>
-
-            {/* Decision Buttons */}
-            {rfp.status === 'analyzed' && !rfp.decision && (
-              <Space size="large">
-                <Button
-                  type="primary"
-                  size="large"
-                  icon={<CheckOutlined />}
-                  onClick={handleGo}
-                  loading={decisionMutation.isPending && pendingDecision === 'go'}
-                  disabled={decisionMutation.isPending && pendingDecision === 'no_go'}
-                  style={{ background: '#52c41a', borderColor: '#52c41a' }}
-                >
-                  GO
-                </Button>
-                <Button
-                  danger
-                  size="large"
-                  icon={<CloseOutlined />}
-                  onClick={handleNoGo}
-                  loading={decisionMutation.isPending && pendingDecision === 'no_go'}
-                  disabled={decisionMutation.isPending && pendingDecision === 'go'}
-                >
-                  NO GO
-                </Button>
-              </Space>
-            )}
-
-            {rfp.decision === 'go' && (
-              <Button
-                type="primary"
-                onClick={() => navigate(`/rfp/${id}/questions`)}
-              >
-                Ver Preguntas
-              </Button>
-            )}
           </div>
-        </div>
 
-        {/* Tabs */}
-        <Tabs
-          activeKey={activeTab}
-          onChange={setActiveTab}
-          items={tabItems}
-          size="large"
-        />
-
-        {/* NO GO Modal */}
-        <Modal
-          title="Confirmar NO GO"
-          open={noGoModalOpen}
-          onOk={confirmNoGo}
-          onCancel={() => setNoGoModalOpen(false)}
-          okText="Confirmar NO GO"
-          okButtonProps={{ danger: true }}
-        >
-          <p>¿Estás seguro de marcar este RFP como NO GO?</p>
-          <TextArea
-            placeholder="Razón del NO GO (opcional)"
-            value={noGoReason}
-            onChange={(e) => setNoGoReason(e.target.value)}
-            rows={4}
+          {/* Tabs */}
+          <Tabs
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            items={tabItems}
+            size="large"
+            className="professional-tabs"
+            style={{ marginTop: 24 }}
           />
-        </Modal>
+
+          {/* NO GO Modal */}
+          <Modal
+            title="Confirmar NO GO"
+            open={noGoModalOpen}
+            onOk={confirmNoGo}
+            onCancel={() => setNoGoModalOpen(false)}
+            okText="Confirmar NO GO"
+            okButtonProps={{ danger: true }}
+          >
+            <p>¿Estás seguro de marcar este RFP como NO GO?</p>
+            <TextArea
+              placeholder="Razón del NO GO (opcional)"
+              value={noGoReason}
+              onChange={(e) => setNoGoReason(e.target.value)}
+              rows={4}
+            />
+          </Modal>
+        </div>
       </Content>
     </AppLayout>
   );

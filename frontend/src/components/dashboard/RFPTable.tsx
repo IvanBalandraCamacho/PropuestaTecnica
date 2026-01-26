@@ -272,14 +272,33 @@ const RFPTable: React.FC<RFPTableProps> = ({ data, pagination }) => {
   ];
 
   return (
-    <Table
-      columns={columns}
-      dataSource={data}
-      rowKey="id"
-      pagination={pagination}
-      scroll={{ x: 1400 }}
-      size="middle"
-    />
+    <div className="content-panel" style={{ borderRadius: 8, overflow: 'hidden', padding: 0 }}>
+      {/* Clean Header */}
+      <div style={{
+        padding: '16px 24px',
+        borderBottom: '1px solid var(--border-color)',
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        background: 'var(--bg-secondary)'
+      }}>
+        <h3 style={{ margin: 0, color: 'var(--text-primary)', fontSize: 15, fontWeight: 600 }}>
+          Listado de Propuestas
+        </h3>
+        <Space size="small">
+          <Button type="text" size="small" icon={<DownloadOutlined />} />
+        </Space>
+      </div>
+      <Table
+        columns={columns}
+        dataSource={data}
+        rowKey="id"
+        pagination={pagination}
+        scroll={{ x: 1400 }}
+        size="middle"
+        rowClassName="hover-lift"
+      />
+    </div>
   );
 };
 

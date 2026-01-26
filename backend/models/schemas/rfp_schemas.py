@@ -215,6 +215,8 @@ class PenaltyItem(BaseModel):
     description: str
     amount: str | None = None
     is_high: bool = False
+    reference_document: str | None = None
+    source: str | None = None  # "detectado por ia" | "detectado en rfp"
 
 
 class RiskItem(BaseModel):

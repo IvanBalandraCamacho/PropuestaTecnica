@@ -17,6 +17,7 @@ import {
   ProjectOutlined,
   ReadOutlined,
   FolderOpenOutlined,
+  RightOutlined
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -36,6 +37,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const [collapsed, setCollapsed] = useState(false);
 
   // Estado del chat (persistente)
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -69,14 +71,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     {
       key: 'profile',
       icon: <UserOutlined />,
-      label: user?.full_name || user?.email,
+      label: <Text strong>{user?.full_name || user?.email}</Text>,
       disabled: true,
     },
     { type: 'divider' as const },
     {
       key: 'logout',
-      icon: <LogoutOutlined />,
-      label: 'Cerrar Sesión',
+      icon: <LogoutOutlined style={{ color: 'var(--color-primary)' }} />,
+      label: <Text type="danger">Cerrar Sesión</Text>,
       onClick: handleLogout,
     },
   ];
@@ -98,47 +100,63 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
 
   const menuItems = [
     { key: '/', icon: <DashboardOutlined />, label: 'Dashboard', onClick: () => navigate('/') },
-    { key: '/rfps', icon: <FileTextOutlined />, label: 'Todos los RFPs', onClick: () => navigate('/rfps') },
-    {
-      key: '/rfps/pending',
-      icon: <ClockCircleOutlined />,
-      label: (
-        <Space>
-          Pendientes
-          {stats && stats.pending_count + stats.analyzing_count > 0 && (
-            <Badge count={stats.pending_count + stats.analyzing_count} size="small" style={{ backgroundColor: '#faad14' }} />
-          )}
-        </Space>
-      ),
-      onClick: () => navigate('/rfps/pending'),
-    },
-    {
-      key: '/rfps/approved',
-      icon: <CheckCircleOutlined />,
-      label: (
-        <Space>
-          Aprobados
-          {stats && stats.go_count > 0 && <Badge count={stats.go_count} size="small" style={{ backgroundColor: '#52c41a' }} />}
-        </Space>
-      ),
-      onClick: () => navigate('/rfps/approved'),
-    },
-    {
-      key: '/rfps/rejected',
-      icon: <CloseCircleOutlined />,
-      label: (
-        <Space>
-          Rechazados
-          {stats && stats.no_go_count > 0 && <Badge count={stats.no_go_count} size="small" style={{ backgroundColor: '#ff4d4f' }} />}
-        </Space>
-      ),
-      onClick: () => navigate('/rfps/rejected'),
-    },
-    { key: '/certifications', icon: <SafetyCertificateOutlined />, label: 'Certificaciones', onClick: () => navigate('/certifications') },
-    { key: '/experiences', icon: <ProjectOutlined />, label: 'Experiencias', onClick: () => navigate('/experiences') },
-    { key: '/chapters', icon: <ReadOutlined />, label: 'Capítulos', onClick: () => navigate('/chapters') },
     { type: 'divider' as const },
-    { key: '/storage', icon: <FolderOpenOutlined />, label: 'Mis Archivos', onClick: () => navigate('/storage') },
+    {
+      key: 'rfps-grp',
+      label: collapsed ? undefined : <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', paddingLeft: 16 }}>Propuestas</Text>,
+      type: 'group' as const,
+      children: [
+        { key: '/rfps', icon: <FileTextOutlined />, label: 'Todos los RFPs', onClick: () => navigate('/rfps') },
+        {
+          key: '/rfps/pending',
+          icon: <ClockCircleOutlined style={{ color: '#faad14' }} />,
+          label: (
+            <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+              Pendientes
+              {stats && stats.pending_count + stats.analyzing_count > 0 && (
+                <Badge count={stats.pending_count + stats.analyzing_count} size="small" style={{ backgroundColor: '#faad14', boxShadow: 'none' }} />
+              )}
+            </Space>
+          ),
+          onClick: () => navigate('/rfps/pending'),
+        },
+        {
+          key: '/rfps/approved',
+          icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />,
+          label: (
+            <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+              Aprobados
+              {stats && stats.go_count > 0 && <Badge count={stats.go_count} size="small" style={{ backgroundColor: '#52c41a', boxShadow: 'none' }} />}
+            </Space>
+          ),
+          onClick: () => navigate('/rfps/approved'),
+        },
+        {
+          key: '/rfps/rejected',
+          icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />,
+          label: (
+            <Space style={{ width: '100%', justifyContent: 'space-between' }}>
+              Rechazados
+              {stats && stats.no_go_count > 0 && <Badge count={stats.no_go_count} size="small" style={{ backgroundColor: '#ff4d4f', boxShadow: 'none' }} />}
+            </Space>
+          ),
+          onClick: () => navigate('/rfps/rejected'),
+        }
+      ]
+    },
+    { type: 'divider' as const },
+    {
+      key: 'kb-grp',
+      label: collapsed ? undefined : <Text type="secondary" style={{ fontSize: 11, textTransform: 'uppercase', paddingLeft: 16 }}>Knowledge Base</Text>,
+      type: 'group' as const,
+      children: [
+        { key: '/certifications', icon: <SafetyCertificateOutlined />, label: 'Certificaciones', onClick: () => navigate('/certifications') },
+        { key: '/experiences', icon: <ProjectOutlined />, label: 'Experiencias', onClick: () => navigate('/experiences') },
+        { key: '/chapters', icon: <ReadOutlined />, label: 'Capítulos', onClick: () => navigate('/chapters') },
+        { key: '/storage', icon: <FolderOpenOutlined />, label: 'Archivos', onClick: () => navigate('/storage') },
+      ]
+    },
+    { type: 'divider' as const },
     { key: '/settings', icon: <SettingOutlined />, label: 'Configuración', onClick: () => navigate('/settings') },
   ];
 
@@ -146,25 +164,124 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     <Layout style={{ minHeight: '100vh' }}>
       <Sider
         theme="dark"
-        width={240}
-        style={{ overflow: 'auto', height: '100vh', position: 'fixed', left: 0, top: 0, bottom: 0 }}
+        collapsible
+        collapsed={collapsed}
+        onCollapse={(value) => setCollapsed(value)}
+        width={260}
+        style={{
+          overflow: 'hidden',
+          height: '100vh',
+          position: 'fixed',
+          left: 0,
+          top: 0,
+          bottom: 0,
+          zIndex: 1000,
+          borderRight: '1px solid var(--border-color)',
+          background: 'var(--bg-secondary)', // Pure dark sidebar
+          boxShadow: '4px 0 24px rgba(0,0,0,0.4)'
+        }}
+        trigger={
+          <div style={{
+            background: 'var(--bg-secondary)',
+            borderTop: '1px solid var(--border-color)',
+            height: 48,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--text-secondary)'
+          }}>
+            {collapsed ? <RightOutlined /> : <div style={{ fontSize: 12, letterSpacing: 1 }}>CERRAR MENÚ</div>}
+          </div>
+        }
       >
-        <div style={{ height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-          <Text strong style={{ color: '#fff', fontSize: 18 }}>◆ TIVIT Proposals</Text>
+        {/* LOGO AREA */}
+        <div style={{
+          height: 72,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: collapsed ? 'center' : 'flex-start',
+          paddingLeft: collapsed ? 0 : 24,
+          borderBottom: '1px solid var(--border-color)',
+          background: 'rgba(227, 24, 55, 0.03)' // Subtle red tint
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <div style={{
+              width: 32,
+              height: 32,
+              background: 'linear-gradient(135deg, #E31837 0%, #B00020 100%)', // Red gradient
+              borderRadius: 8,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 4px 12px rgba(227, 24, 55, 0.4)'
+            }}>
+              <span style={{ color: '#fff', fontWeight: 'bold', fontSize: 18 }}>T</span>
+            </div>
+            {!collapsed && (
+              <Text style={{ fontSize: 20, fontWeight: 700, color: '#fff', letterSpacing: '-0.5px' }}>
+                TIVIT<span style={{ color: 'var(--color-primary)' }}>.AI</span>
+              </Text>
+            )}
+          </div>
         </div>
-        <Menu theme="dark" mode="inline" selectedKeys={[getSelectedKey()]} items={menuItems} style={{ marginTop: 16 }} />
+
+        <Menu
+          theme="dark"
+          mode="inline"
+          selectedKeys={[getSelectedKey()]}
+          items={menuItems}
+          style={{
+            marginTop: 16,
+            background: 'transparent',
+            borderRight: 'none',
+            padding: '0 8px'
+          }}
+        />
       </Sider>
 
-      <Layout style={{ marginLeft: 240 }}>
-        <Header style={{ background: '#fff', padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' }}>
-          <Dropdown menu={{ items: userMenuItems }} placement="bottomRight">
-            <Space style={{ cursor: 'pointer' }}>
-              <Avatar icon={<UserOutlined />} />
-              <Text>{user?.full_name}</Text>
+      <Layout style={{
+        marginLeft: collapsed ? 80 : 260,
+        background: 'var(--bg-primary)',
+        transition: 'all 0.2s ease'
+      }}>
+        <Header style={{
+          padding: '0 32px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          height: 72,
+          background: 'var(--bg-primary)',
+          borderBottom: '1px solid var(--border-color)',
+          zIndex: 900
+        }}>
+          <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" trigger={['click']}>
+            <Space style={{
+              cursor: 'pointer',
+              padding: '8px 16px',
+              borderRadius: 30, // Pill shape
+              transition: 'all 0.2s ease',
+              border: '1px solid var(--border-color)',
+              background: 'var(--bg-tertiary)'
+            }}
+              className="hover-lift"
+            >
+              <Avatar
+                size="small"
+                icon={<UserOutlined />}
+                style={{
+                  backgroundColor: 'var(--color-primary)',
+                  color: '#fff',
+                  verticalAlign: 'middle',
+                  marginRight: 4
+                }}
+              />
+              <Text strong style={{ color: 'var(--text-secondary)' }}>{user?.full_name?.split(' ')[0]}</Text>
             </Space>
           </Dropdown>
         </Header>
-        <Content style={{ background: '#f5f5f5' }}>{children}</Content>
+        <Content style={{ background: 'var(--bg-primary)', padding: '32px' }}>
+          {children}
+        </Content>
       </Layout>
 
       {/* Floating Chat */}

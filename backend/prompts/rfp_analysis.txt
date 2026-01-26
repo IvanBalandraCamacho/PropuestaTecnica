@@ -232,17 +232,20 @@ Responde SOLO con un JSON valido (sin markdown, sin explicaciones) con este form
   
   "penalties": [
     {
-      "description": "Descripción de la multa [Fuente: doc_X, Pag Y]",
+      "description": "Descripción de la multa",
       "amount": "Monto o porcentaje (ej: 1% mensual)",
-      "is_high": false
+      "is_high": false,
+      "reference_document": "NombreArchivo, Pagina X",
+      "source": "detectado en rfp | detectado por ia"
     }
   ],
   
   "risks": [
     {
       "category": "financial/technical/legal/timeline",
-      "description": "Descripción del riesgo [Fuente: doc_X, Pag Y]",
-      "severity": "high/medium/low/critical"
+      "description": "Descripción del riesgo",
+      "severity": "high/medium/low/critical",
+      "reference_document": "NombreArchivo, Pagina X"
     }
   ],
   

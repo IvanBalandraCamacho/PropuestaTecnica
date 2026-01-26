@@ -140,6 +140,8 @@ export interface ExtractedRFPData {
         description: string;
         amount: string | null;
         is_high: boolean;
+        reference_document?: string;
+        source?: string;
     }>;
     risks: Array<{
         category: string;
