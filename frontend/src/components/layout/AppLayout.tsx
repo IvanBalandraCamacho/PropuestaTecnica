@@ -255,28 +255,42 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
           zIndex: 900
         }}>
           <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" trigger={['click']}>
-            <Space style={{
-              cursor: 'pointer',
-              padding: '8px 16px',
-              borderRadius: 30, // Pill shape
-              transition: 'all 0.2s ease',
-              border: '1px solid var(--border-color)',
-              background: 'var(--bg-tertiary)'
-            }}
+            <div
               className="hover-lift"
+              style={{
+                cursor: 'pointer',
+                padding: '4px 12px 4px 4px', // Tighter padding
+                borderRadius: 40,
+                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                border: '1px solid rgba(255, 255, 255, 0.08)',
+                background: 'rgba(0, 0, 0, 0.4)', // Darker, glass-like
+                backdropFilter: 'blur(10px)',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                height: 40 // Fixed, smaller height
+              }}
             >
               <Avatar
-                size="small"
+                size={32}
                 icon={<UserOutlined />}
                 style={{
-                  backgroundColor: 'var(--color-primary)',
+                  background: 'linear-gradient(135deg, #E31837 0%, #ff4d4f 100%)', // Premium gradient
                   color: '#fff',
-                  verticalAlign: 'middle',
-                  marginRight: 4
+                  border: '2px solid rgba(255,255,255,0.1)'
                 }}
               />
-              <Text strong style={{ color: 'var(--text-secondary)' }}>{user?.full_name?.split(' ')[0]}</Text>
-            </Space>
+              <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.1, marginRight: 4 }}>
+                <Text style={{ color: '#fff', fontSize: 13, fontWeight: 500, letterSpacing: '0.3px' }}>
+                  {user?.full_name?.split(' ')[0]}
+                </Text>
+                <Text style={{ color: 'rgba(255,255,255,0.4)', fontSize: 10, fontWeight: 400 }}>
+                  Admin
+                </Text>
+              </div>
+              <RightOutlined style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)' }} />
+            </div>
           </Dropdown>
         </Header>
         <Content style={{ background: 'var(--bg-primary)', padding: '32px' }}>
