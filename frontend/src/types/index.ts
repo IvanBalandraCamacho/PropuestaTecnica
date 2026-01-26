@@ -133,6 +133,8 @@ export interface ExtractedRFPData {
         description: string;
         metric: string | null;
         is_aggressive: boolean;
+        reference_document?: string;
+        source?: string;
     }>;
     penalties: Array<{
         description: string;

@@ -13,7 +13,7 @@ import {
   ExclamationCircleOutlined, CalendarOutlined, DollarOutlined,
   GlobalOutlined, CodeOutlined, TeamOutlined, SearchOutlined, ReloadOutlined,
   EditOutlined, SaveOutlined, CloseCircleOutlined, NumberOutlined, AppstoreOutlined,
-  ClockCircleOutlined, RobotOutlined, FileTextOutlined
+  ClockCircleOutlined, RobotOutlined, FileTextOutlined, InfoCircleOutlined
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { rfpApi } from '../lib/api';
@@ -232,48 +232,7 @@ const RFPDetailPage: React.FC = () => {
       .replace(/\b\w/g, (char) => char.toUpperCase());
   };
 
-  // Formatear duración a formato humano (semanas, meses, años)
-  const formatDuration = (duration: string | number | null | undefined): { display: string; tooltip: string | null } => {
-    if (!duration) return { display: '-', tooltip: null };
 
-    // Si es string, intentar extraer número de días
-    let days: number;
-    const durationStr = String(duration).toLowerCase();
-
-    // Detectar si ya tiene formato (ej: "12 meses", "6 semanas")
-    if (durationStr.includes('mes') || durationStr.includes('month')) {
-      return { display: String(duration), tooltip: null };
-    }
-    if (durationStr.includes('año') || durationStr.includes('year')) {
-      return { display: String(duration), tooltip: null };
-    }
-    if (durationStr.includes('semana') || durationStr.includes('week')) {
-      return { display: String(duration), tooltip: null };
-    }
-
-    // Extraer número
-    const match = durationStr.match(/(\d+)/);
-    if (!match) return { display: String(duration), tooltip: null };
-
-    days = parseInt(match[1], 10);
-    if (isNaN(days) || days <= 0) return { display: String(duration), tooltip: null };
-
-    const exactDays = `${days} días`;
-
-    // Redondear según magnitud
-    if (days >= 365) {
-      const years = Math.round(days / 365 * 10) / 10; // 1 decimal
-      return { display: `${years} año${years !== 1 ? 's' : ''}`, tooltip: exactDays };
-    } else if (days >= 30) {
-      const months = Math.round(days / 30 * 10) / 10;
-      return { display: `${months} mes${months !== 1 ? 'es' : ''}`, tooltip: exactDays };
-    } else if (days >= 7) {
-      const weeks = Math.round(days / 7 * 10) / 10;
-      return { display: `${weeks} semana${weeks !== 1 ? 's' : ''}`, tooltip: exactDays };
-    }
-
-    return { display: exactDays, tooltip: null };
-  };
 
   if (isLoading) {
     return (
@@ -562,10 +521,74 @@ const RFPDetailPage: React.FC = () => {
                     dataSource={extracted.sla}
                     renderItem={(sla) => (
                       <List.Item>
-                        <Space direction="vertical" size={0}>
-                          <div><CitationViewer text={sla.description} files={rfp.files} /></div>
-                          {sla.metric && <Text type="secondary">{sla.metric}</Text>}
-                          {sla.is_aggressive && <Tag color="red">Agresivo</Tag>}
+                        <Space direction="vertical" size={4} style={{ width: '100%' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ flex: 1 }}>
+                              <CitationViewer text={sla.description} files={rfp.files} />
+                            </div>
+
+                            {/* Premium Reference UI - Minimal "Bolita" */}
+                            {sla.reference_document && (
+                              <Tooltip
+                                title={
+                                  <Space direction="vertical" size={0}>
+                                    <Text style={{ color: 'white', fontSize: 12 }}>Fuente detectada:</Text>
+                                    <Text style={{ color: 'white', fontWeight: 600 }}>{sla.reference_document}</Text>
+                                  </Space>
+                                }
+                                color="blue"
+                              >
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    width: 24,
+                                    height: 24,
+                                    borderRadius: '50%',
+                                    // Use standard colors or transparency
+                                    background: 'rgba(24, 144, 255, 0.15)',
+                                    color: '#1890ff',
+                                    cursor: 'pointer',
+                                    marginLeft: 12,
+                                    flexShrink: 0,
+                                    transition: 'all 0.3s ease'
+                                  }}
+                                  onMouseOver={(e) => {
+                                    e.currentTarget.style.background = '#1890ff';
+                                    e.currentTarget.style.color = '#fff';
+                                  }}
+                                  onMouseOut={(e) => {
+                                    e.currentTarget.style.background = 'rgba(24, 144, 255, 0.15)';
+                                    e.currentTarget.style.color = '#1890ff';
+                                  }}
+                                >
+                                  <InfoCircleOutlined style={{ fontSize: 14 }} />
+                                </div>
+                              </Tooltip>
+                            )}
+                          </div>
+
+                          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            {sla.source === 'detectado por ia' && (
+                              <Tag color="purple" style={{ fontSize: 11, margin: 0 }}>
+                                <RobotOutlined style={{ marginRight: 4 }} /> IA
+                              </Tag>
+                            )}
+                            {sla.source === 'detectado en rfp' && (
+                              <Tag color="cyan" style={{ fontSize: 11, margin: 0 }}>
+                                <FileTextOutlined style={{ marginRight: 4 }} /> RFP
+                              </Tag>
+                            )}
+                            {sla.is_aggressive && (
+                              <Tag color="red" style={{ fontSize: 11, margin: 0 }}>Agresivo</Tag>
+                            )}
+                            {sla.metric && (
+                              <Text type="secondary" style={{ fontSize: 12 }}>
+                                | Métrica: {sla.metric}
+                              </Text>
+                            )}
+                          </div>
                         </Space>
                       </List.Item>
                     )}

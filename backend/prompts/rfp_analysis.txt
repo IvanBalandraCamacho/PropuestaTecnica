@@ -9,14 +9,6 @@ El input puede contener multiples archivos delimitados por tags XML <document>.
 2. **Validacion Cruzada (Consistency Check)**: 
    - Verifica si el presupuesto en el Excel cubre el alcance en el PDF Tecnico.
    - Si detectas discrepancias (ej: Piden "Senior Expert" pero presupuesto es "Junior"), reportalo en la seccion de riegos.
-3. **Citas Verificables (CRÍTICO)**:
-   - CADA ITEM extraído (especialmente en listas) DEBE tener su fuente.
-   - Formato OBLIGATORIO: `Texto del item [Fuente: NombreArchivo, Pagina X]`
-   - EJEMPLO CORRECTO:
-     - "Riesgo de multa del 1% [Fuente: Bases_Admin.pdf, Pag 12]"
-     - "SLA Nivel 1: 99.9% uptime [Fuente: Anexo_Tecnico.docx, Pag 5]"
-   - EJEMPLO INCORRECTO:
-     - "Riesgo de multa del 1%" (FALTA FUENTE)
    - APLICA A: `risks`, `sla`, `penalties`, `recommendation_reasons`, `budget.notes`.
 
 
@@ -124,6 +116,11 @@ Un certificado es relevante si:
 
 Clasifica la relevancia como "high", "medium", o "low".
 
+## ASIGNACIÓN DE FUENTE SLA (IMPORTANTE)
+Para cada SLA, debes determinar el campo "source":
+- "detectado en rfp": Si el SLA aparece escrito explícitamente en los documentos.
+- "detectado por ia": Si infieres el SLA basado en buenas prácticas o si es un estándar de industria no explícito.
+
 ## RESPUESTA JSON
 
 Responde SOLO con un JSON valido (sin markdown, sin explicaciones) con este formato:
@@ -225,9 +222,11 @@ Responde SOLO con un JSON valido (sin markdown, sin explicaciones) con este form
   
   "sla": [
     {
-      "description": "Descripción del SLA [Fuente: doc_X, Pag Y]",
+      "description": "Descripción del SLA",
       "metric": "Métrica (ej: 99.9%)",
-      "is_aggressive": false
+      "is_aggressive": false,
+      "reference_document": "NombreArchivo, Pagina X",
+      "source": "detectado en rfp | detectado por ia"
     }
   ],
   

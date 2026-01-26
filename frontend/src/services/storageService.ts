@@ -39,10 +39,10 @@ export const storageService = {
   getFolders: async (parentId?: string): Promise<Carpeta[]> => {
     try {
       const params = parentId ? { parent_id: parentId } : {};
-      const response = await axios.get(`${API_URL}/folders`, { 
+      const response = await axios.get(`${API_URL}/folders`, {
         params,
         headers: {
-            Authorization: `Bearer ${localStorage.getItem('access_token')}` // Asumiendo manejo de token estándar
+          Authorization: `Bearer ${localStorage.getItem('access_token')}` // Asumiendo manejo de token estándar
         }
       });
       return response.data;
@@ -58,9 +58,9 @@ export const storageService = {
   getFolderContent: async (folderId: string, filters: Record<string, any> = {}): Promise<FolderContent> => {
     try {
       const response = await axios.get(`${API_URL}/folders/${folderId}`, {
-         params: filters,
-         headers: {
-            Authorization: `Bearer ${localStorage.getItem('access_token')}`
+        params: filters,
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('access_token')}`
         }
       });
       return response.data;
@@ -75,14 +75,14 @@ export const storageService = {
    * Retorna una URL para que el navegador inicie la descarga.
    */
   getDownloadUrl: (fileId: string): string => {
-      // Retornamos la URL directa al endpoint de descarga. 
-      // El navegador (o window.open) manejará esto junto con el token si es necesario, 
-      // pero para descargas de archivos a veces es más fácil usar un link directo si la auth es por cookie 
-      // o manejarlo via blob si es bearer.
-      // Dado que usamos Bearer, lo mejor es hacer la petición Axios blob.
-      return `${API_URL}/files/${fileId}/download`;
+    // Retornamos la URL directa al endpoint de descarga. 
+    // El navegador (o window.open) manejará esto junto con el token si es necesario, 
+    // pero para descargas de archivos a veces es más fácil usar un link directo si la auth es por cookie 
+    // o manejarlo via blob si es bearer.
+    // Dado que usamos Bearer, lo mejor es hacer la petición Axios blob.
+    return `${API_URL}/files/${fileId}/download`;
   },
-  
+
   /**
    * Descarga el archivo manejando la autenticación Bearer token
    */
@@ -91,10 +91,10 @@ export const storageService = {
       const response = await axios.get(`${API_URL}/files/${fileId}/download`, {
         responseType: 'blob',
         headers: {
-            Authorization: `Bearer ${localStorage.getItem('access_token')}`
+          Authorization: `Bearer ${localStorage.getItem('access_token')}`
         }
       });
-      
+
       // Crear link temporal
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
@@ -102,13 +102,13 @@ export const storageService = {
       link.setAttribute('download', fileName);
       document.body.appendChild(link);
       link.click();
-      
+
       // Limpiar
       link.parentNode?.removeChild(link);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-       console.error('Download failed:', error);
-       throw error;
+      console.error('Download failed:', error);
+      throw error;
     }
   },
 
@@ -117,46 +117,46 @@ export const storageService = {
    * Retorna { url, type }
    */
   getFileViewUrl: async (fileId: string): Promise<{ url: string, type: string }> => {
-      try {
-          // SIEMPRE usar fallback local/proxy (Blob) para evitar problemas de CORS con GCS
-          // cuando se renderiza dentro de un componente (react-doc-viewer).
-          // Use /preview endpoint which handles DOCX -> PDF conversion
-          const blobResponse = await axios.get(`${API_URL}/files/${fileId}/preview?t=${new Date().getTime()}`, {
-            responseType: 'blob',
-            headers: {
-                Authorization: `Bearer ${localStorage.getItem('access_token')}`
-            }
-          });
-          
-          let fileType = blobResponse.headers['content-type'];
-          
-          // If the original request was for a file but we got PDF back, ensure frontend knows it's PDF
-          // Note: Backend preview endpoint returns application/pdf for converted DOCX
-          if (fileType === 'application/pdf') {
-              console.log("Received PDF preview for file");
-          }
+    try {
+      // SIEMPRE usar fallback local/proxy (Blob) para evitar problemas de CORS con GCS
+      // cuando se renderiza dentro de un componente (react-doc-viewer).
+      // Use /preview endpoint which handles DOCX -> PDF conversion
+      const blobResponse = await axios.get(`${API_URL}/files/${fileId}/preview?t=${new Date().getTime()}`, {
+        responseType: 'blob',
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem('access_token')}`
+        }
+      });
 
-          const blob = new Blob([blobResponse.data], { type: fileType });
-          const blobUrl = window.URL.createObjectURL(blob);
-          
-          return { url: blobUrl, type: fileType || 'application/octet-stream' };
-          
-      } catch (error) {
-          console.error('Get view URL failed:', error);
-          throw error;
+      let fileType = blobResponse.headers['content-type'];
+
+      // If the original request was for a file but we got PDF back, ensure frontend knows it's PDF
+      // Note: Backend preview endpoint returns application/pdf for converted DOCX
+      if (fileType === 'application/pdf') {
+        console.log("Received PDF preview for file");
       }
+
+      const blob = new Blob([blobResponse.data], { type: fileType });
+      const blobUrl = window.URL.createObjectURL(blob);
+
+      return { url: blobUrl, type: fileType || 'application/octet-stream' };
+
+    } catch (error) {
+      console.error('Get view URL failed:', error);
+      throw error;
+    }
   },
 
   /**
    * Intenta abrir el archivo en una nueva pestaña (Legacy).
    */
-  viewFile: async (fileId: string, fileName: string) => {
-      try {
-          const { url } = await storageService.getFileViewUrl(fileId);
-          window.open(url, '_blank');
-      } catch (error) {
-          console.error('View failed:', error);
-          throw error;
-      }
+  viewFile: async (fileId: string, _fileName: string) => {
+    try {
+      const { url } = await storageService.getFileViewUrl(fileId);
+      window.open(url, '_blank');
+    } catch (error) {
+      console.error('View failed:', error);
+      throw error;
+    }
   }
 };

@@ -206,6 +206,8 @@ class SLAItem(BaseModel):
     description: str
     metric: str | None = None
     is_aggressive: bool = False
+    reference_document: str | None = None
+    source: str | None = None  # "detectado por ia" | "detectado en rfp"
 
 
 class PenaltyItem(BaseModel):
