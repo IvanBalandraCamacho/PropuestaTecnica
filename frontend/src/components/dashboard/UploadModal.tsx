@@ -101,7 +101,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ open, onCancel, onSuccess }) 
     if (step === 'idle') {
       return (
         <div style={{ marginTop: 20 }}>
-          <Dragger {...uploadProps} height={150}>
+          <Dragger {...uploadProps} height={200}>
             <p className="ant-upload-drag-icon">
               <InboxOutlined />
             </p>
