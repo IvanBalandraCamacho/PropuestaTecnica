@@ -81,7 +81,8 @@ async def upload_rfp(
         file_gcs_path="multi_file_project", # Placeholder para legacy
         file_size_bytes=0,
         status=RFPStatus.ANALYZING.value,
-        client_name="Detecting...", 
+        client_name="Detecting...",
+        title=project_name, 
     )
     db.add(rfp)
     await db.commit()
@@ -365,7 +366,10 @@ async def update_rfp(
     """
     result = await db.execute(
         select(RFPSubmission)
-        .options(selectinload(RFPSubmission.questions))
+        .options(
+            selectinload(RFPSubmission.questions),
+            selectinload(RFPSubmission.files)
+        )
         .where(RFPSubmission.id == rfp_id)
     )
     rfp = result.scalar_one_or_none()
@@ -408,7 +412,14 @@ async def make_decision(
     db: AsyncSession = Depends(get_db),
 ):
 
-    result = await db.execute(select(RFPSubmission).options(selectinload(RFPSubmission.questions)).where(RFPSubmission.id == rfp_id))
+    result = await db.execute(
+        select(RFPSubmission)
+        .options(
+            selectinload(RFPSubmission.questions),
+            selectinload(RFPSubmission.files)
+        )
+        .where(RFPSubmission.id == rfp_id)
+    )
     rfp = result.scalar_one_or_none()
     
     if not rfp:

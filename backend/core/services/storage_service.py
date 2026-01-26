@@ -13,18 +13,18 @@ logger = logging.getLogger(__name__)
 
 
 
-async def init_user_storage(db: AsyncSession, user_id: uuid.UUID):
+async def init_user_storage(db: AsyncSession, user: User):
   
     try:
-        user_str_id = str(user_id)
+        user_str_id = str(user.id)
         root_url = Constantes.UrlNames.STORAGE + Constantes.SLASH + user_str_id 
         root_folder = await create_folder(
             db=db,
-            name=Constantes.Storage.ROOT + Constantes.UNDERSCORE + user_str_id,
+            name=user.full_name,
             url=root_url
         )
         
-        await _link_folder_to_user(db, user_id, root_folder.carpeta_id)
+        await _link_folder_to_user(db, user.id, root_folder.carpeta_id)
         
         await create_folder(
             db=db,

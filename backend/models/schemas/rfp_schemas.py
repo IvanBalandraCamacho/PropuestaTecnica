@@ -79,6 +79,7 @@ class RFPDecision(BaseModel):
 
 class RFPUpdate(BaseModel):
     """Schema for updating RFP fields."""
+    title: str | None = None
     client_name: str | None = None
     country: str | None = None
     category: str | None = None
@@ -112,6 +113,7 @@ class RFPSummary(BaseModel):
     
     id: UUID
     file_name: str
+    title: str | None = None
     status: RFPStatusEnum
     client_name: str | None = None
     country: str | None = None
