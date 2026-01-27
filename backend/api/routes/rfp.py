@@ -2,11 +2,12 @@
 Endpoints para gestión de RFPs.
 Usa almacenamiento híbrido (GCS con fallback local).
 """
+from core.services.storage_service import change_folder
+from core.services.storage_service import get_files_by_rfp_id
+from models import Archivo
 from core.services.storage_service import get_user_folder
-from core.services.storage_service import create_file
 from utils.constantes import Constantes
 from core.services.storage_service import create_folder
-import json
 import logging
 from datetime import datetime
 from uuid import UUID
@@ -33,7 +34,6 @@ from models.schemas import (
     RFPListResponse,
     RFPQuestion as RFPQuestionSchema,
     TeamSuggestionRequest,
-    TeamSuggestionResponse,
 )
 from schemas.chat import RFPChatRequest, RFPChatResponse
 from core.gcp import get_gemini_client
@@ -46,16 +46,16 @@ router = APIRouter(prefix="/rfp", tags=["RFP"])
 
 @router.post("/upload", response_model=UploadResponse)
 async def upload_rfp(
+    background_tasks: BackgroundTasks,
     files: list[UploadFile] = File(...),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Sube múltiples archivos para un proyecto RFP y realiza el análisis estructurado.
+    Sube múltiples archivos para un proyecto RFP.
     
-    - Acepta múltiples PDF, DOCX, XLSX
-    - Ingesta "Premium" (Excel estructurado)
-    - Análisis contextual cruzado (PDF vs Excel)
+    El análisis se realiza en background para evitar timeouts.
+    Estado inicial: ANALYZING.
     """
     if not files:
         raise HTTPException(status_code=400, detail="No se enviaron archivos")
@@ -73,12 +73,11 @@ async def upload_rfp(
             logger.warning(f"File type warning: {file.filename} ({file.content_type}). Processing anyway.")
 
     # 1. Crear Submission (Contenedor del Proyecto)
-    # Usamos el nombre del primer archivo como nombre del proyecto por defecto
     project_name = files[0].filename
     
     rfp = RFPSubmission(
-        file_name=project_name, # Legacy comp. -> Nombre del proyecto
-        file_gcs_path="multi_file_project", # Placeholder para legacy
+        file_name=project_name, 
+        file_gcs_path="multi_file_project", 
         file_size_bytes=0,
         status=RFPStatus.ANALYZING.value,
         client_name="Detecting...",
@@ -89,16 +88,11 @@ async def upload_rfp(
     await db.refresh(rfp)
     
     storage = get_storage_service()
-    analyzer = get_analyzer_service()
-    
     files_data_for_analysis = []
+    total_size = 0
     
     try:
-        total_size = 0
-        
         # 2. Procesar y Guardar cada archivo
-        from models.rfp import RFPFile
-        
         for file in files:
             content = await file.read()
             size = len(content)
@@ -111,13 +105,15 @@ async def upload_rfp(
                 content_type=file.content_type or "application/octet-stream",
             )
             
-            # Crear registro RFPFile
-            rfp_file = RFPFile(
+            # Crear registro Archivo (ahora carpeta_id es nullable)
+            rfp_file = Archivo(
                 rfp_id=rfp.id,
-                filename=file.filename,
-                file_gcs_path=file_uri,
-                file_size_bytes=size,
+                nombre=file.filename,
+                url=file_uri,
                 file_type=file.filename.split(".")[-1].lower(),
+                creado=datetime.utcnow(),
+                habilitado=Constantes.HABILITADO,
+                file_size_bytes=size
             )
             db.add(rfp_file)
             
@@ -132,98 +128,90 @@ async def upload_rfp(
         rfp.file_size_bytes = total_size
         await db.commit()
         
-        # 3. Análisis Multi-Archivo (Síncrono por ahora, idealmente background)
-        # Obtener modo de análisis
+        # 3. Despachar Análisis Background
         user_prefs = current_user.preferences or {}
         analysis_mode = user_prefs.get("analysis_mode", "balanced")
         
-        extracted_data = await analyzer.analyze_rfp_project(
-            files=files_data_for_analysis,
-            analysis_mode=analysis_mode,
-            db=db
+        background_tasks.add_task(
+            analyze_project_background_task,
+            rfp_id=rfp.id,
+            files_data=files_data_for_analysis,
+            analysis_mode=analysis_mode
         )
-        
-        # 4. Actualizar Submission con resultados
-        indexed_fields = analyzer.extract_indexed_fields(extracted_data)
-        
-        rfp.extracted_data = extracted_data
-        rfp.status = RFPStatus.ANALYZED.value
-        rfp.analyzed_at = datetime.utcnow()
-        
-        for field, value in indexed_fields.items():
-            setattr(rfp, field, value)
-            
-        if "recommended_isos" in extracted_data:
-            rfp.recommended_isos = extracted_data["recommended_isos"]
-            
-        await db.commit()
-        await db.refresh(rfp)
         
         return UploadResponse(
             id=rfp.id,
             file_name=project_name,
-            status=RFPStatus.ANALYZED.value,
-            message=f"Proyecto analizado exitosamente ({len(files)} archivos).",
+            status=RFPStatus.ANALYZING.value,
+            message=f"Proyecto recibido ({len(files)} archivos). Analizando en segundo plano...",
         )
 
     except Exception as e:
-        logger.error(f"Error analyzing RFP Project {rfp.id}: {e}", exc_info=True)
+        logger.error(f"Error uploading RFP Project {rfp.id}: {e}", exc_info=True)
         try:
             rfp.status = RFPStatus.ERROR.value
             await db.commit()
         except:
             pass
-        raise HTTPException(status_code=500, detail=f"Error en análisis: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error en carga: {str(e)}")
 
 
-async def analyze_rfp_task(rfp_id: str, file_uri: str, file_content: bytes):
-    """Task en background para analizar el RFP."""
+async def analyze_project_background_task(
+    rfp_id: UUID,
+    files_data: list[dict],
+    analysis_mode: str
+):
+    """Task en background para analizar el proyecto RFP completo."""
     from core.database import AsyncSessionLocal
+    
+    logger.info(f"Starting background analysis for RFP {rfp_id}")
     
     async with AsyncSessionLocal() as db:
         rfp = None
         try:
-            # Obtener RFP
+            # Re-obtener RFP
             result = await db.execute(
                 select(RFPSubmission).where(RFPSubmission.id == rfp_id)
             )
             rfp = result.scalar_one_or_none()
             
             if not rfp:
-                logger.error(f"RFP not found: {rfp_id}")
+                logger.error(f"RFP {rfp_id} not found in background task")
                 return
-            
-            # Actualizar status
-            rfp.status = RFPStatus.ANALYZING.value
-            await db.commit()
-            
-            # Analizar con Gemini
+
             analyzer = get_analyzer_service()
-            extracted_data = await analyzer.analyze_rfp_from_content(file_content, rfp.file_name, db=db)
             
-            # Extraer campos indexados
+            # Ejecutar análisis
+            extracted_data = await analyzer.analyze_rfp_project(
+                files=files_data,
+                analysis_mode=analysis_mode,
+                db=db
+            )
+            
+            # Actualizar RFP con resultados
             indexed_fields = analyzer.extract_indexed_fields(extracted_data)
             
-            # Actualizar RFP
             rfp.extracted_data = extracted_data
             rfp.status = RFPStatus.ANALYZED.value
             rfp.analyzed_at = datetime.utcnow()
             
             for field, value in indexed_fields.items():
                 setattr(rfp, field, value)
-            
-            # Guardar recommended_isos en su columna específica
+                
             if "recommended_isos" in extracted_data:
                 rfp.recommended_isos = extracted_data["recommended_isos"]
-            
+                
             await db.commit()
-            logger.info(f"RFP analysis completed: {rfp_id}")
+            logger.info(f"RFP {rfp_id} analysis completed successfully")
             
         except Exception as e:
-            logger.error(f"Error analyzing RFP {rfp_id}: {e}")
+            logger.error(f"Error in background analysis for RFP {rfp_id}: {e}", exc_info=True)
             if rfp:
-                rfp.status = RFPStatus.ERROR.value
-                await db.commit()
+                try:
+                    rfp.status = RFPStatus.ERROR.value
+                    await db.commit()
+                except:
+                    pass
 
 
 # ============ DOWNLOAD ============
@@ -470,13 +458,17 @@ async def crear_carpetas_go(db: AsyncSession, rfp: RFPSubmission, user_id: UUID)
         parent_id=carpeta_go.carpeta_id
     )
 
-    # guardar rfp 
-    await create_file(
-        db=db,
-        name=rfp.file_gcs_path.rsplit("/", 1)[-1], 
-        carpeta_id=carpeta_tvt.carpeta_id, 
-        url=rfp.file_gcs_path
-    )
+    files = await get_files_by_rfp_id(db, rfp.id)
+
+    for file in files:
+        await change_folder(
+            db=db,
+            carpeta_id=carpeta_tvt.carpeta_id,
+            archivo_id=file.archivo_id
+        )
+
+    
+
 
 async def crear_carpetas_no_go(db: AsyncSession, rfp: RFPSubmission, user_id: UUID):
     
@@ -494,12 +486,14 @@ async def crear_carpetas_no_go(db: AsyncSession, rfp: RFPSubmission, user_id: UU
         parent_id=carpeta_no_go.carpeta_id
     )
 
-    await create_file(
-        db=db,
-        name=rfp.file_gcs_path.rsplit("/", 1)[-1], 
-        carpeta_id=carpeta_tvt.carpeta_id, 
-        url=rfp.file_gcs_path
-    )
+    files = await get_files_by_rfp_id(db, rfp.id)
+
+    for file in files:
+        await change_folder(
+            db=db,
+            carpeta_id=carpeta_tvt.carpeta_id,
+            archivo_id=file.archivo_id
+        )
 
 async def generate_questions_task(rfp_id: str, extracted_data: dict):
     """Task en background para generar preguntas."""

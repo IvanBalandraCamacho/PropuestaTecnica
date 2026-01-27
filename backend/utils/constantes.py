@@ -5,6 +5,8 @@ class Constantes:
     SLASH = "/"
     DASH = "-"
     UNDERSCORE = "_"
+    HABILITADO = True
+    DESHABILITADO = False
 
     class UrlNames: 
         STORAGE = "storage"
@@ -14,7 +16,7 @@ class Constantes:
         ROOT = "root"
         GO = "go"
         NO_GO = "no_go"
-        PROPOSALS = "proposals"
+        PROPOSALS = "propuestas"
         VERSION = "version"
 
     class Countries:

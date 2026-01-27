@@ -130,15 +130,6 @@ class RFPSummary(BaseModel):
     analyzed_at: datetime | None = None
 
 
-class RFPFile(BaseModel):
-    """Schema for uploaded file."""
-    model_config = ConfigDict(from_attributes=True)
-    
-    id: UUID
-    filename: str
-    file_type: str
-    file_size_bytes: int | None = None
-    created_at: datetime
 
 
 class RFPDetail(RFPSummary):
@@ -156,7 +147,7 @@ class RFPDetail(RFPSummary):
     decided_at: datetime | None = None
     updated_at: datetime
     questions: list[RFPQuestion] = []
-    files: list[RFPFile] = []
+   
 
 
 # ============ DASHBOARD SCHEMAS ============

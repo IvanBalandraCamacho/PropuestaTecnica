@@ -1,13 +1,13 @@
-"""
-Modelos para el sistema de almacenamiento (Storage) de RFPs.
-"""
+
+
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import Integer
 import uuid
 from datetime import datetime
 import sqlalchemy
 from sqlalchemy import String, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
-
 from core.database import Base
 
 class Carpeta(Base):
@@ -66,10 +66,10 @@ class Archivo(Base):
         default=uuid.uuid4
     )
     
-    carpeta_id: Mapped[uuid.UUID] = mapped_column(
+    carpeta_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), 
         ForeignKey("carpeta.carpeta_id"),
-        nullable=False
+        nullable=True
     )
     
     nombre: Mapped[str | None] = mapped_column(String(500), nullable=True)
@@ -81,9 +81,21 @@ class Archivo(Base):
         nullable=True
     )
     habilitado: Mapped[bool] = mapped_column(Boolean, default=True)
+
+    # Campos adicionales solicitados
+    rfp_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("rfp_submissions.id"),
+        nullable=True
+    )
+    file_size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    file_type: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    processed_content: Mapped[str | None] = mapped_column(Text, nullable=True)
+    meta_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
     
     # Relaciones
     carpeta: Mapped["Carpeta"] = relationship("Carpeta", back_populates="archivos")
+    # rfp relationship to be added if needed, or backref from RFPSubmission
     
     def __repr__(self) -> str:
         return f"<Archivo {self.nombre}>"

@@ -13,6 +13,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
 
 from core.database import Base
+from core.database import Base
 
 
 class RFPStatus(str, PyEnum):
@@ -140,9 +141,9 @@ class RFPSubmission(Base):
         cascade="all, delete-orphan"
     )
 
-    files: Mapped[list["RFPFile"]] = relationship(
-        "RFPFile",
-        back_populates="rfp",
+    files: Mapped[list["Archivo"]] = relationship(
+        "Archivo",
+        backref="rfp_submission", # Use backref or explicit relationship if defined in Archivo
         cascade="all, delete-orphan"
     )
     
@@ -209,51 +210,4 @@ class RFPQuestion(Base):
         return f"<RFPQuestion {self.id} - {self.category}>"
 
 
-class RFPFile(Base):
-    """Modelo para archivos adjuntos de un RFP."""
-    
-    __tablename__ = "rfp_files"
-    
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), 
-        primary_key=True, 
-        default=uuid.uuid4
-    )
-    
-    # Foreign key
-    rfp_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), 
-        ForeignKey("rfp_submissions.id", ondelete="CASCADE"),
-        nullable=False
-    )
-    
-    # Metadata del archivo
-    filename: Mapped[str] = mapped_column(String(255), nullable=False)
-    file_gcs_path: Mapped[str] = mapped_column(String(500), nullable=False)
-    file_size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    file_type: Mapped[str] = mapped_column(String(20), nullable=False)  # pdf, docx, xlsx, etc.
-    
-    # Contenido procesado (Premium Feature)
-    # Aquí guardamos el Markdown de Excels o el texto limpio de PDFs para no reprocesar
-    processed_content: Mapped[str | None] = mapped_column(Text, nullable=True)
-    
-    # Metadata extra (ej: número de páginas, hojas de excel)
-    meta_data: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    
-    # Timestamps
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), 
-        default=datetime.utcnow,
-        nullable=False
-    )
-    
-    # Relaciones
-    rfp: Mapped["RFPSubmission"] = relationship("RFPSubmission", back_populates="files")
-    
-    # Índices
-    __table_args__ = (
-        Index("idx_rfp_files_rfp", "rfp_id"),
-    )
-    
-    def __repr__(self) -> str:
-        return f"<RFPFile {self.filename}>"
+

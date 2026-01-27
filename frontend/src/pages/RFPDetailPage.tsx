@@ -12,7 +12,7 @@ import {
   ArrowLeftOutlined, CheckOutlined, CloseOutlined,
   GlobalOutlined, DollarOutlined,
   TeamOutlined, SearchOutlined, ReloadOutlined,
-  BarChartOutlined, MessageOutlined
+  BarChartOutlined, MessageOutlined, ExclamationCircleOutlined
 } from '@ant-design/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { rfpApi } from '../lib/api';
@@ -78,6 +78,10 @@ const RFPDetailPage: React.FC = () => {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [form] = Form.useForm();
 
+  // Error Modal State
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorModalContent, setErrorModalContent] = useState('');
+
   // RFP data
   const { data: rfp, isLoading } = useQuery({
     queryKey: ['rfp', id],
@@ -138,8 +142,10 @@ const RFPDetailPage: React.FC = () => {
         navigate(`/rfp/${id}/questions`);
       }
     },
-    onError: () => {
-      message.error('Error al registrar la decisión');
+    onError: (error: any) => {
+      const errorMsg = error.response?.data?.detail || 'Error al registrar la decisión';
+      setErrorModalContent(errorMsg);
+      setErrorModalVisible(true);
       setPendingDecision(null);
     },
   });
@@ -495,6 +501,46 @@ const RFPDetailPage: React.FC = () => {
               onChange={(e) => setNoGoReason(e.target.value)}
               rows={4}
             />
+          </Modal>
+
+          {/* Error Modal */}
+          <Modal
+            open={errorModalVisible}
+            footer={[
+              <Button key="ok" type="primary" onClick={() => setErrorModalVisible(false)}>
+                Entendido
+              </Button>
+            ]}
+            onCancel={() => setErrorModalVisible(false)}
+            closable={false}
+            title={
+              <Space>
+                <ExclamationCircleOutlined style={{ color: '#ff4d4f', fontSize: 22 }} />
+                <span style={{ fontSize: 18 }}>Error al procesar decisión</span>
+              </Space>
+            }
+          >
+            <div style={{ marginTop: 16 }}>
+              <p style={{ fontSize: 16, color: 'var(--text-primary)' }}>
+                {errorModalContent}
+              </p>
+              <div style={{
+                marginTop: 16,
+                padding: 12,
+                background: 'var(--bg-tertiary)',
+                borderRadius: 8,
+                border: '1px solid var(--border-color)'
+              }}>
+                <Text type="secondary" style={{ fontSize: 13 }}>
+                  <Space align="start">
+                    <ExclamationCircleOutlined />
+                    <span>
+                      Verifica que los datos del RFP estén completos (especialmente el TVT) y que tengas permisos para crear carpetas.
+                    </span>
+                  </Space>
+                </Text>
+              </div>
+            </div>
           </Modal>
         </div>
       </Content>
