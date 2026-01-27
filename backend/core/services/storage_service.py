@@ -13,18 +13,18 @@ logger = logging.getLogger(__name__)
 
 
 
-async def init_user_storage(db: AsyncSession, user_id: uuid.UUID):
+async def init_user_storage(db: AsyncSession, user: User):
   
     try:
-        user_str_id = str(user_id)
+        user_str_id = str(user.id)
         root_url = Constantes.UrlNames.STORAGE + Constantes.SLASH + user_str_id 
         root_folder = await create_folder(
             db=db,
-            name=Constantes.Storage.ROOT + Constantes.UNDERSCORE + user_str_id,
+            name=user.full_name,
             url=root_url
         )
         
-        await _link_folder_to_user(db, user_id, root_folder.carpeta_id)
+        await _link_folder_to_user(db, user.id, root_folder.carpeta_id)
         
         await create_folder(
             db=db,
@@ -146,3 +146,31 @@ async def create_file(
     await db.flush()
     await db.refresh(file)
     return file
+
+
+async def get_files_by_rfp_id(db: AsyncSession, rfp_id: uuid.UUID) -> list[Archivo]:
+    query = select(Archivo).where(
+        Archivo.rfp_id == rfp_id,
+        Archivo.habilitado == Constantes.HABILITADO
+    )
+    result = await db.execute(query)
+    return list(result.scalars().all())
+
+
+async def change_folder(
+    db: AsyncSession,
+    carpeta_id: uuid.UUID,
+    archivo_id: uuid.UUID,
+) -> Archivo | None:
+   
+    query = select(Archivo).where(Archivo.archivo_id == archivo_id)
+    result = await db.execute(query)
+    file = result.scalar_one_or_none()
+   
+    if file:
+        file.carpeta_id = carpeta_id
+        await db.commit()
+        await db.refresh(file)
+        
+    return file
+

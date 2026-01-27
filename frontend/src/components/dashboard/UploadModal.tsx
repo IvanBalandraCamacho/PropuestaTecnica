@@ -145,7 +145,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ open, onCancel, onSuccess }) 
             <Text type="secondary">Sube los documentos del RFP para iniciar el análisis</Text>
           </div>
 
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 16, overflowY: 'auto', minHeight: 0, paddingRight: 4 }}>
             <Dragger
               {...uploadProps}
               style={{
@@ -170,7 +170,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ open, onCancel, onSuccess }) 
             </Dragger>
 
             {/* File List Preview */}
-            <div style={{ maxHeight: 150, overflowY: 'auto', padding: '0 4px' }}>
+            <div style={{ padding: '0 4px' }}>
               {fileList.map(file => (
                 <div key={file.uid} style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',

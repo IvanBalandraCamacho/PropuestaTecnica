@@ -108,13 +108,15 @@ Para CADA rol en team_estimation, incluye en market_rate:
 TIVIT cuenta con las siguientes certificaciones y experiencias activas:
 {{available_certifications}}
 
-Analiza cuáles de estas certificaciones son RELEVANTES para este RFP específico.
-Un certificado es relevante si:
+Analiza cuáles de estas certificaciones son RELEVANTES para esta Licitación específica.
+Una certificación es relevante si:
 - Es requerido explícitamente en el documento.
 - Es deseable o valorado en la industria del cliente (ej: ISO 27001 para banca).
 - Demuestra experiencia en tecnologías o dominios solicitados.
 
 Clasifica la relevancia como "high", "medium", o "low".
+
+
 
 ## ASIGNACIÓN DE FUENTE SLA (IMPORTANTE)
 Para cada SLA, debes determinar el campo "source":
@@ -258,7 +260,7 @@ Responde SOLO con un JSON valido (sin markdown, sin explicaciones) con este form
   "confidence_score": 75,
   "recommended_isos": [
     {
-      "id": "uuid-referencia-certificacion",
+      "id": "ID del certificado recomendado",
       "level": "high | medium | low"
     }
   ]

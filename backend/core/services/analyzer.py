@@ -301,10 +301,46 @@ class RFPAnalyzerService:
         # The analysis_prompt is expected to already contain the premium instructions.
         # The full_context is passed as document_content.
         
+        prompt_to_use = self.analysis_prompt
+        
+        # Inyectar certificaciones si hay DB
+        if db:
+            try:
+                result = await db.execute(
+                    select(Certification).where(Certification.is_active == True)
+                )
+                certs = result.scalars().all()
+                if certs:
+                    cert_list_str = "\n".join([
+                        f"- ID: {c.id} (nombre: {c.name}): {c.description[:100]}..."
+                        for c in certs
+                    ])
+                    logger.info(f"Certificaciones disponibles:\n{cert_list_str}")
+                    prompt_to_use = prompt_to_use.replace(
+                        "{{available_certifications}}", cert_list_str
+                    )
+                    logger.info(f"Injected {len(certs)} certifications into prompt")
+                else:
+                    prompt_to_use = prompt_to_use.replace(
+                        "{{available_certifications}}", 
+                        "No hay certificaciones disponibles."
+                    )
+            except Exception as e:
+                logger.error(f"Error fetching certifications: {e}")
+                prompt_to_use = prompt_to_use.replace(
+                    "{{available_certifications}}", 
+                    "Error al recuperar certificaciones."
+                )
+        else:
+            prompt_to_use = prompt_to_use.replace(
+                "{{available_certifications}}", 
+                "No disponible (sin conexión a DB)."
+            )
+
         # 3. Llamada a Gemini (1.5 Pro maneja el contexto largo)
         result = await self.gemini.analyze_document(
             document_content=full_context,
-            prompt=self.analysis_prompt,
+            prompt=prompt_to_use,
             analysis_mode=analysis_mode,
         )
         
@@ -384,9 +420,10 @@ class RFPAnalyzerService:
                 certs = result.scalars().all()
                 if certs:
                     cert_list_str = "\n".join([
-                        f"- {c.name} (ID: {c.id}): {c.description[:100]}..."
+                        f"- ID: {c.id} (nombre: {c.name}): {c.description[:100]}..."
                         for c in certs
                     ])
+                    logger.info(f"Certificaciones disponibles:\n{cert_list_str}")
                     prompt_to_use = prompt_to_use.replace(
                         "{{available_certifications}}", cert_list_str
                     )

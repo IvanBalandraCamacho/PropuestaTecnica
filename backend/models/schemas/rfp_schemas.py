@@ -79,6 +79,7 @@ class RFPDecision(BaseModel):
 
 class RFPUpdate(BaseModel):
     """Schema for updating RFP fields."""
+    title: str | None = None
     client_name: str | None = None
     country: str | None = None
     category: str | None = None
@@ -112,6 +113,7 @@ class RFPSummary(BaseModel):
     
     id: UUID
     file_name: str
+    title: str | None = None
     status: RFPStatusEnum
     client_name: str | None = None
     country: str | None = None
@@ -128,15 +130,6 @@ class RFPSummary(BaseModel):
     analyzed_at: datetime | None = None
 
 
-class RFPFile(BaseModel):
-    """Schema for uploaded file."""
-    model_config = ConfigDict(from_attributes=True)
-    
-    id: UUID
-    filename: str
-    file_type: str
-    file_size_bytes: int | None = None
-    created_at: datetime
 
 
 class RFPDetail(RFPSummary):
@@ -154,7 +147,7 @@ class RFPDetail(RFPSummary):
     decided_at: datetime | None = None
     updated_at: datetime
     questions: list[RFPQuestion] = []
-    files: list[RFPFile] = []
+   
 
 
 # ============ DASHBOARD SCHEMAS ============

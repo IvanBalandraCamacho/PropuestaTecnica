@@ -51,7 +51,7 @@ async def register(
     )
     
     # Inicializar almacenamiento del usuario
-    await init_user_storage(db, user.id)
+    await init_user_storage(db, user)
     
     await db.commit()
     await db.refresh(user)
