@@ -108,6 +108,7 @@ async def download_file(
 @router.get("/files/{file_id}/preview")
 async def preview_file(
     file_id: uuid.UUID,
+    token: str | None = None, # Make explicit for Swagger UI if needed, but Depends handles it
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -140,79 +141,25 @@ async def preview_file(
              except: pass
 
         # 2. Determinar tipo
-        is_docx = archivo.nombre.lower().endswith(".docx")
+        is_word = archivo.nombre.lower().endswith((".docx", ".doc"))
         is_pdf = archivo.nombre.lower().endswith(".pdf")
         
         from fastapi.responses import StreamingResponse
         import io
-        import os
-        import tempfile
-        from docx2pdf import convert
+        from core.utils.document_converter import convert_word_to_pdf
         
-        if is_docx:
-            # Conversion Logica
-            logger.info(f"Converting DOCX {file_id} to PDF for preview...")
+        if is_word:
+            logger.info(f"Converting Word document {file_id} to PDF for preview...")
+            pdf_content = convert_word_to_pdf(file_content, archivo.nombre)
             
-            # Create temp files
-            with tempfile.NamedTemporaryFile(suffix=".docx", delete=False) as tmp_docx:
-                tmp_docx.write(file_content)
-                docx_path = tmp_docx.name
-                
-            pdf_path = docx_path.replace(".docx", ".pdf")
-            
-            try:
-                # IMPORTANT: Initialize COM for this thread (required for docx2pdf/word in FastAPI)
-                # Imports here to handle missing libraries gracefully
-                try:
-                    from docx2pdf import convert
-                    import pythoncom
-                except ImportError as ie:
-                    raise Exception(f"Required libraries not found: {ie}")
-
-                pythoncom.CoInitialize()
-                
-                # Convert synchronously (blocking, but necessary for COM)
-                # Note: docx2pdf opens Word. Might fail if headless or no Word installed.
-                convert(docx_path, pdf_path)
-                
-                if os.path.exists(pdf_path):
-                    with open(pdf_path, "rb") as f:
-                        pdf_content = f.read()
-                        
-                    # Cleanup
-                    try:
-                        os.remove(docx_path)
-                        os.remove(pdf_path)
-                    except: pass
-                    
-                    return StreamingResponse(
-                        io.BytesIO(pdf_content),
-                        media_type="application/pdf",
-                        headers={"Content-Disposition": "inline"}
-                    )
-                else:
-                    raise Exception("PDF file was not created by convert()")
-                    
-            except Exception as e:
-                logger.error(f"DOCX conversion failed (Falling back to DOCX viewer): {e}")
-                # Log to a file we can read from the agent
-                with open("conversion_error.log", "w") as f:
-                    f.write(str(e))
-                
-                # Fallback: Return original DOCX (viewer will use legacy renderer)
-                # Clean up docx if exists
-                try: os.remove(docx_path)
-                except: pass
-                
+            if pdf_content:
                 return StreamingResponse(
-                    io.BytesIO(file_content), 
-                    media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    io.BytesIO(pdf_content),
+                    media_type="application/pdf",
                     headers={"Content-Disposition": "inline"}
                 )
-            finally:
-                # Uninitialize COM to avoid leaks
-                try: pythoncom.CoUninitialize()
-                except: pass
+            else:
+                logger.warning("Preview validation failed (conversion returned None), returning original.")
                 
         # If PDF or other, return as is inline
         media_type = "application/pdf" if is_pdf else "application/octet-stream"

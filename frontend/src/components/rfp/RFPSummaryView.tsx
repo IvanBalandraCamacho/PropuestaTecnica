@@ -10,7 +10,7 @@ import {
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import { CitationViewer } from '../common/CitationViewer';
-import type { RFPDetail } from '../../types';
+import type { RFPDetail, RFPFile } from '../../types';
 
 const { Title, Text, Paragraph } = Typography;
 
@@ -22,6 +22,7 @@ interface RFPSummaryViewProps {
     onSave: () => void;
     form: any;
     saving?: boolean;
+    onPreviewFile?: (file: RFPFile, page?: number) => void;
 }
 
 const RFPSummaryView: React.FC<RFPSummaryViewProps> = ({
@@ -31,7 +32,8 @@ const RFPSummaryView: React.FC<RFPSummaryViewProps> = ({
     onCancel,
     onSave,
     form,
-    saving = false
+    saving = false,
+    onPreviewFile
 }) => {
     // Helpers
     const validateTVT = (_: unknown, value: string) => {
@@ -86,7 +88,7 @@ const RFPSummaryView: React.FC<RFPSummaryViewProps> = ({
                             {rfp.proposal_deadline ? dayjs(rfp.proposal_deadline).format('DD/MM/YYYY') : '-'}
                         </Descriptions.Item>
                         <Descriptions.Item label={<><ClockCircleOutlined style={{ marginRight: 4 }} /> Duración</>}>
-                            <CitationViewer text={rfp.project_duration || '-'} files={rfp.files} />
+                            <CitationViewer text={rfp.project_duration || '-'} files={rfp.files} onPreviewFile={onPreviewFile} />
                         </Descriptions.Item>
                         <Descriptions.Item label={<><RobotOutlined style={{ marginRight: 4 }} /> Confianza IA</>}>
                             <Tag color={rfp.confidence_score && rfp.confidence_score > 80 ? 'green' : 'gold'}>
@@ -172,7 +174,7 @@ const RFPSummaryView: React.FC<RFPSummaryViewProps> = ({
                     <Divider style={{ borderColor: 'var(--border-color)', margin: '24px 0' }} />
                     <Title level={5} style={{ color: 'var(--text-primary)' }}>Resumen Ejecutivo</Title>
                     <div style={{ color: 'var(--text-secondary)', lineHeight: 1.6 }}>
-                        <CitationViewer text={rfp.summary} files={rfp.files} />
+                        <CitationViewer text={rfp.summary} files={rfp.files} onPreviewFile={onPreviewFile} />
                     </div>
                 </>
             )}

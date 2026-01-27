@@ -19,6 +19,7 @@ interface TeamEstimationViewProps {
   teamEstimation: TeamEstimation | null;
   loading?: boolean;
   files: RFPFile[] | undefined;
+  onPreviewFile?: (file: RFPFile, page?: number) => void;
 }
 
 const seniorityColors: Record<Seniority, string> = {
@@ -35,7 +36,7 @@ const seniorityLabels: Record<Seniority, string> = {
   lead: 'Lead',
 };
 
-const TeamEstimationView: React.FC<TeamEstimationViewProps> = ({ teamEstimation, loading, files }) => {
+const TeamEstimationView: React.FC<TeamEstimationViewProps> = ({ teamEstimation, loading, files, onPreviewFile }) => {
   // Estado para manejar roles editables
   const [editableRoles, setEditableRoles] = useState<RoleEstimation[]>(
     teamEstimation?.roles || []
@@ -84,7 +85,7 @@ const TeamEstimationView: React.FC<TeamEstimationViewProps> = ({ teamEstimation,
           <Text strong style={{ color: 'var(--text-primary)', fontSize: 15 }}>{title}</Text>
           {record.justification && (
             <div style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
-              <CitationViewer text={record.justification} files={files} />
+              <CitationViewer text={record.justification} files={files} onPreviewFile={onPreviewFile} />
             </div>
           )}
         </Space>
@@ -286,7 +287,7 @@ const TeamEstimationView: React.FC<TeamEstimationViewProps> = ({ teamEstimation,
             <Text strong style={{ fontSize: 16 }}>Justificación de la Estimación</Text>
           </Space>
           <div style={{ color: 'var(--text-secondary)', lineHeight: 1.6, paddingLeft: 24, borderLeft: '2px solid var(--color-info)' }}>
-            <CitationViewer text={teamEstimation.rationale} files={files} />
+            <CitationViewer text={teamEstimation.rationale} files={files} onPreviewFile={onPreviewFile} />
           </div>
         </div>
       )}

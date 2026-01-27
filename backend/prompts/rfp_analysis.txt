@@ -11,6 +11,14 @@ El input puede contener multiples archivos delimitados por tags XML <document>.
    - Si detectas discrepancias (ej: Piden "Senior Expert" pero presupuesto es "Junior"), reportalo en la seccion de riegos.
    - APLICA A: `risks`, `sla`, `penalties`, `recommendation_reasons`, `budget.notes`.
 
+## INSTRUCCIONES DE CITACION (REFERENCIAS)
+
+El texto extraido de los documentos PDF incluye marcadores explícitos `<<Pagina X>>`.
+Para CADA campo que requiera `reference_document`:
+- Debes indicar el Nombre del Archivo Y el Numero de Pagina exacto donde encontraste la información.
+- Formato esperado: "NombreArchivo.pdf, Pagina 5"
+- Si la informacion aparece en múltiples paginas, lístalas: "NombreArchivo.pdf, Paginas 5, 8, 12"
+- Si no encuentras el marcador de pagina exacto, usa "NombreArchivo.pdf" (solo si es un Excel o texto plano).
 
 ## PASO 1: DETECTAR ESCENARIO
 
