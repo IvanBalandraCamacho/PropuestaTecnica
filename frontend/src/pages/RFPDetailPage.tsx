@@ -25,7 +25,9 @@ import {
   RFPAnalysisView
 } from '../components/rfp';
 import ChatWidget from '../components/chat/ChatWidget';
-import type { RFPStatus, Recommendation, RFPUpdate, ChatMessage } from '../types';
+import FilePreviewModal from '../components/common/FilePreviewModal';
+import { useFilePreloader } from '../hooks/useFilePreloader';
+import type { RFPStatus, Recommendation, RFPUpdate, ChatMessage, RFPFile } from '../types';
 import dayjs from 'dayjs';
 
 const { Title, Text } = Typography;
@@ -82,12 +84,33 @@ const RFPDetailPage: React.FC = () => {
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [errorModalContent, setErrorModalContent] = useState('');
 
+  // File Preview State
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewFile, setPreviewFile] = useState<{ url: string | null; name: string; type: string } | null>(null);
+
   // RFP data
   const { data: rfp, isLoading } = useQuery({
     queryKey: ['rfp', id],
     queryFn: () => rfpApi.get(id!),
     enabled: !!id,
   });
+
+  // Collect all citations for pre-loading
+  const allCitations = React.useMemo(() => {
+    if (!rfp?.extracted_data) return [];
+
+    const citations: string[] = [];
+    const data = rfp.extracted_data;
+
+    if (data.risks) data.risks.forEach(r => r.reference_document && citations.push(r.reference_document));
+    if (data.sla) data.sla.forEach(s => s.reference_document && citations.push(s.reference_document));
+    if (data.penalties) data.penalties.forEach(p => p.reference_document && citations.push(p.reference_document));
+
+    return citations;
+  }, [rfp]);
+
+  // Use preloader hook
+  const { getFileUrl } = useFilePreloader(rfp?.files || [], allCitations);
 
   // Initialize form when RFP data loads
   useEffect(() => {
@@ -209,6 +232,39 @@ const RFPDetailPage: React.FC = () => {
     }
   };
 
+  const handlePreviewFile = async (file: RFPFile, page?: number) => {
+    try {
+      const loadingMsg = message.loading('Cargando vista previa...', 0);
+      const fileId = file.archivo_id || file.id;
+
+      if (!fileId) {
+        loadingMsg(); // Clear loading
+        message.error('Archivo sin ID');
+        return;
+      }
+
+      // Use pre-loader (returns cached or fetches)
+      const { url, type } = await getFileUrl(fileId);
+
+      let finalUrl = url;
+      if (page) {
+        finalUrl += `#page=${page}`;
+      }
+
+      loadingMsg(); // process finish
+      setPreviewFile({
+        url: finalUrl,
+        name: file.nombre || file.filename || 'Documento',
+        type: type || file.file_type || 'application/octet-stream'
+      });
+      setPreviewVisible(true);
+    } catch (error) {
+      message.destroy();
+      message.error('Error al cargar el archivo');
+      console.error(error);
+    }
+  };
+
   const handleCancelEdit = () => {
     setIsEditing(false);
     // Reset form to original values
@@ -274,6 +330,7 @@ const RFPDetailPage: React.FC = () => {
           onSave={handleSaveEdit}
           form={form}
           saving={updateMutation.isPending}
+          onPreviewFile={handlePreviewFile}
         />
       ),
     },
@@ -285,7 +342,7 @@ const RFPDetailPage: React.FC = () => {
           Análisis
         </span>
       ),
-      children: <RFPAnalysisView rfp={rfp} />,
+      children: <RFPAnalysisView rfp={rfp} onPreviewFile={handlePreviewFile} />,
     },
     {
       key: 'team',
@@ -300,6 +357,7 @@ const RFPDetailPage: React.FC = () => {
           teamEstimation={teamData?.team_estimation || null}
           loading={teamDataLoading}
           files={rfp.files}
+          onPreviewFile={handlePreviewFile}
         />
       ),
     },
@@ -543,6 +601,17 @@ const RFPDetailPage: React.FC = () => {
             </div>
           </Modal>
         </div>
+
+        {/* File Preview Modal */}
+        {previewFile && (
+          <FilePreviewModal
+            visible={previewVisible}
+            onClose={() => setPreviewVisible(false)}
+            fileUrl={previewFile.url}
+            fileName={previewFile.name}
+            fileType={previewFile.type}
+          />
+        )}
       </Content>
     </AppLayout>
   );

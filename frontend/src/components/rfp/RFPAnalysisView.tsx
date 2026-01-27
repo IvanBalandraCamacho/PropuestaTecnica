@@ -5,12 +5,13 @@ import {
 } from '@ant-design/icons';
 import { CitationViewer } from '../common/CitationViewer';
 import { SourceBadge } from '../common/SourceBadge';
-import type { RFPDetail, Recommendation } from '../../types';
+import type { RFPDetail, Recommendation, RFPFile } from '../../types';
 
 const { Title, Text } = Typography;
 
 interface RFPAnalysisViewProps {
     rfp: RFPDetail;
+    onPreviewFile?: (file: RFPFile, page?: number) => void;
 }
 
 const recommendationColors: Record<Recommendation, string> = {
@@ -21,7 +22,7 @@ const recommendationColors: Record<Recommendation, string> = {
     strong_no_go: 'red',
 };
 
-const RFPAnalysisView: React.FC<RFPAnalysisViewProps> = ({ rfp }) => {
+const RFPAnalysisView: React.FC<RFPAnalysisViewProps> = ({ rfp, onPreviewFile }) => {
     const extracted = rfp.extracted_data;
 
     if (!extracted) return <div className="content-panel" style={{ padding: 24 }}>No hay análisis disponible.</div>;
@@ -38,7 +39,7 @@ const RFPAnalysisView: React.FC<RFPAnalysisViewProps> = ({ rfp }) => {
                         <Space wrap>
                             {extracted.tech_stack.map((tech, i) => (
                                 <Tag key={i} color="blue" style={{ padding: '4px 12px', borderRadius: 4 }}>
-                                    <CitationViewer text={tech} files={rfp.files} />
+                                    <CitationViewer text={tech} files={rfp.files} onPreviewFile={onPreviewFile} />
                                 </Tag>
                             ))}
                         </Space>
@@ -63,7 +64,11 @@ const RFPAnalysisView: React.FC<RFPAnalysisViewProps> = ({ rfp }) => {
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                                                 <Space>
                                                     <Text strong style={{ color: 'var(--text-primary)' }}>{risk.category.replace(/_/g, ' ').toUpperCase()}</Text>
-                                                    <SourceBadge referenceDocument={risk.reference_document} />
+                                                    <SourceBadge
+                                                        referenceDocument={risk.reference_document}
+                                                        files={rfp.files}
+                                                        onPreviewFile={onPreviewFile}
+                                                    />
                                                 </Space>
                                                 <Tag color={severityColors[risk.severity] || 'default'}>{risk.severity.toUpperCase()}</Tag>
                                             </div>
@@ -85,7 +90,7 @@ const RFPAnalysisView: React.FC<RFPAnalysisViewProps> = ({ rfp }) => {
                         <ul style={{ paddingLeft: 20, margin: 0, color: 'var(--text-secondary)' }}>
                             {extracted.recommendation_reasons.map((reason, idx) => (
                                 <li key={idx} style={{ marginBottom: 8 }}>
-                                    <CitationViewer text={reason} files={rfp.files} />
+                                    <CitationViewer text={reason} files={rfp.files} onPreviewFile={onPreviewFile} />
                                 </li>
                             ))}
                         </ul>
@@ -102,9 +107,14 @@ const RFPAnalysisView: React.FC<RFPAnalysisViewProps> = ({ rfp }) => {
                             <div key={idx} style={{ padding: '12px 24px', borderBottom: '1px solid var(--border-color)' }}>
                                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 8 }}>
                                     <div style={{ color: 'var(--text-secondary)', flex: 1 }}>
-                                        <CitationViewer text={sla.description} files={rfp.files} />
+                                        <CitationViewer text={sla.description} files={rfp.files} onPreviewFile={onPreviewFile} />
                                     </div>
-                                    <SourceBadge source={sla.source} referenceDocument={sla.reference_document} />
+                                    <SourceBadge
+                                        source={sla.source}
+                                        referenceDocument={sla.reference_document}
+                                        files={rfp.files}
+                                        onPreviewFile={onPreviewFile}
+                                    />
                                 </div>
                                 <Space size={4}>
                                     {sla.is_aggressive && <Tag color="red" style={{ fontSize: 10 }}>Agresivo</Tag>}
@@ -125,9 +135,14 @@ const RFPAnalysisView: React.FC<RFPAnalysisViewProps> = ({ rfp }) => {
                             <div key={idx} style={{ padding: '12px 24px', borderBottom: '1px solid var(--border-color)' }}>
                                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 }}>
                                     <div style={{ color: 'var(--text-secondary)', flex: 1 }}>
-                                        <CitationViewer text={pen.description} files={rfp.files} />
+                                        <CitationViewer text={pen.description} files={rfp.files} onPreviewFile={onPreviewFile} />
                                     </div>
-                                    <SourceBadge source={pen.source} referenceDocument={pen.reference_document} />
+                                    <SourceBadge
+                                        source={pen.source}
+                                        referenceDocument={pen.reference_document}
+                                        files={rfp.files}
+                                        onPreviewFile={onPreviewFile}
+                                    />
                                 </div>
                                 {pen.amount && <Text style={{ color: 'var(--text-primary)', fontSize: 12, fontWeight: 600 }}>{pen.amount}</Text>}
                             </div>

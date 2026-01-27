@@ -281,7 +281,7 @@ const StoragePage: React.FC = () => {
                                             bodyStyle={{ padding: '16px', height: '100%' }}
                                             style={{ position: 'relative', height: '100%', display: 'flex', flexDirection: 'column' }}
                                         >
-                                            {/* Delete Button */}
+                                            {/* Delete Button - Temporarily disabled for all folders
                                             <Button
                                                 type="text"
                                                 danger
@@ -293,6 +293,7 @@ const StoragePage: React.FC = () => {
                                                     message.info('Delete logic here');
                                                 }}
                                             />
+                                            */}
 
                                             <div style={{ flex: 1 }}>
                                                 {/* Enriched View for TVTs */}

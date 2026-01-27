@@ -1,7 +1,5 @@
 import React from 'react';
 import { Modal, Button } from 'antd';
-import DocViewer, { DocViewerRenderers } from "@cyntler/react-doc-viewer";
-import DocxRenderer from './renderers/DocxRenderer';
 
 interface FilePreviewModalProps {
     visible: boolean;
@@ -13,11 +11,22 @@ interface FilePreviewModalProps {
 
 const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ visible, onClose, fileUrl, fileName, fileType }) => {
 
-    if (!fileUrl) return null;
+    if (!visible) return null;
 
-    const docs = [
-        { uri: fileUrl, fileName: fileName, fileType: fileType }
-    ];
+    // Get auth token
+    const token = localStorage.getItem('access_token');
+
+    // Construct authenticated URL
+    let authenticatedUrl = fileUrl;
+    if (fileUrl && token && !fileUrl.startsWith('blob:')) {
+        const separator = fileUrl.includes('?') ? '&' : '?';
+        // Ensure we don't duplicate existing fragment if present (handle #page=X)
+        const [base, fragment] = fileUrl.split('#');
+        authenticatedUrl = `${base}${separator}access_token=${token}`;
+        if (fragment) {
+            authenticatedUrl += `#${fragment}`;
+        }
+    }
 
     return (
         <Modal
@@ -25,8 +34,13 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ visible, onClose, f
             open={visible}
             onCancel={onClose}
             footer={[
-                <a key="download" href={fileUrl || '#'} download={fileName} style={{ textDecoration: 'none' }}>
-                    <Button type="primary" onClick={(e) => { if (!fileUrl) e.preventDefault(); }}>
+                <a
+                    key="download"
+                    href={authenticatedUrl || '#'}
+                    download={fileName}
+                    style={{ textDecoration: 'none' }}
+                >
+                    <Button type="primary">
                         Descargar
                     </Button>
                 </a>,
@@ -34,24 +48,20 @@ const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ visible, onClose, f
                     Cerrar
                 </Button>
             ]}
-            width="80%"
+            width="90%"
             style={{ top: 20 }}
-            bodyStyle={{ height: '80vh', padding: 0 }}
+            styles={{ body: { height: '85vh', padding: 0, overflow: 'hidden' } }}
             destroyOnClose
         >
-            <DocViewer
-                documents={docs}
-                pluginRenderers={[DocxRenderer, ...DocViewerRenderers]}
-                style={{ height: '100%' }}
-                config={{
-                    header: {
-                        disableHeader: true,
-                        disableFileName: true,
-                        retainURLParams: true
-                    },
-                    pdfVerticalScrollByDefault: true
-                }}
-            />
+            {authenticatedUrl ? (
+                <iframe
+                    src={authenticatedUrl}
+                    style={{ width: '100%', height: '100%', border: 'none' }}
+                    title="Vista previa del documento"
+                />
+            ) : (
+                <div style={{ padding: 20, textAlign: 'center' }}>No hay URL válida para previsualizar.</div>
+            )}
         </Modal>
     );
 };

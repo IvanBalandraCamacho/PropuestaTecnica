@@ -194,15 +194,22 @@ class RFPAnalyzerService:
         return self._gemini
     
     def extract_text_from_pdf(self, content: bytes) -> str:
-        """Extrae texto de un PDF."""
+        """Extrae texto de un PDF con marcadores de página."""
         try:
             reader = PdfReader(io.BytesIO(content))
             text_parts = []
-            for page in reader.pages:
+            for i, page in enumerate(reader.pages, 1):
                 text = page.extract_text()
                 if text:
-                    text_parts.append(text)
-            return "\n\n".join(text_parts)
+                    # Inyectar marcador de página explícito
+                    page_content = f"<<Pagina {i}>>\n{text}"
+                    text_parts.append(page_content)
+                else:
+                    logger.warning(f"Page {i} yielded no text (scanned image?)")
+            
+            full_text = "\n\n".join(text_parts)
+            logger.info(f"PDF Extraction result: {len(reader.pages)} pages, {len(full_text)} chars extracted.")
+            return full_text
         except Exception as e:
             logger.error(f"Error extracting PDF text: {e}")
             raise

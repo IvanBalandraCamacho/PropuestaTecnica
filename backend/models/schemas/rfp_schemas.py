@@ -7,6 +7,7 @@ from uuid import UUID
 from enum import Enum
 
 from pydantic import BaseModel, Field, ConfigDict
+from .storage_schemas import ArchivoSchema
 
 
 # ============ ENUMS ============
@@ -147,6 +148,7 @@ class RFPDetail(RFPSummary):
     decided_at: datetime | None = None
     updated_at: datetime
     questions: list[RFPQuestion] = []
+    files: list[ArchivoSchema] = []
    
 
 

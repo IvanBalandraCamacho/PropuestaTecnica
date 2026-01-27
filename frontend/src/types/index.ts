@@ -98,11 +98,16 @@ export interface RFPDetail extends RFPSummary {
 }
 
 export interface RFPFile {
-    id: string;
-    filename: string;
-    file_type: string;
-    file_size_bytes: number;
-    created_at: string;
+    archivo_id: string;
+    nombre: string;
+    url?: string;
+    file_type?: string;
+    file_size_bytes?: number;
+    creado?: string;
+    habilitado: boolean;
+    // Compatibility helpers (optional)
+    id?: string;
+    filename?: string;
 }
 
 export interface ExtractedRFPData {

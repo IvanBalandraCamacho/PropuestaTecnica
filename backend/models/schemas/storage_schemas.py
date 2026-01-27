@@ -5,11 +5,13 @@ from pydantic import BaseModel
 
 class ArchivoSchema(BaseModel):
     archivo_id: UUID
-    carpeta_id: UUID
+    carpeta_id: UUID | None = None
     nombre: str
     url: Optional[str] = None
     creado: Optional[datetime] = None
     habilitado: bool
+    file_type: str | None = None
+    file_size_bytes: int | None = None
 
     class Config:
         from_attributes = True

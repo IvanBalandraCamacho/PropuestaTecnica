@@ -8,6 +8,7 @@ from models import Archivo
 from core.services.storage_service import get_user_folder
 from utils.constantes import Constantes
 from core.services.storage_service import create_folder
+from core.utils.document_converter import convert_word_to_pdf
 import logging
 from datetime import datetime
 from uuid import UUID
@@ -99,18 +100,52 @@ async def upload_rfp(
             total_size += size
             
             # Guardar en Storage
+            
+            # --- CONVERSION AUTOMATICA WORD -> PDF ---
+            is_word = (
+                file.content_type in [
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    "application/msword"
+                ] or 
+                file.filename.lower().endswith((".docx", ".doc"))
+            )
+            
+            final_content = content
+            final_filename = file.filename
+            final_content_type = file.content_type or "application/octet-stream"
+            
+            if is_word:
+                logger.info(f"Auto-converting uploaded file {file.filename} to PDF...")
+                pdf_content = convert_word_to_pdf(content, file.filename)
+                
+                if pdf_content:
+                    final_content = pdf_content
+                    # Cambiar extensión a .pdf
+                    base_name = ".".join(file.filename.split(".")[:-1])
+                    final_filename = f"{base_name}.pdf"
+                    final_content_type = "application/pdf"
+                    size = len(final_content) # Update size
+                    # Update total size tracker adjustment (remove old size, add new)
+                    # total_size was added with original size above, let's correct it effectively?
+                    # Actually logic above: total_size += size. Let's just correct total_size
+                    total_size = total_size - len(content) + size
+                    
+                    logger.info(f"Conversion successful. New filename: {final_filename}")
+                else:
+                    logger.warning("Conversion failed. Storing original file.")
+
             file_uri = storage.upload_file(
-                file_content=content,
-                file_name=file.filename,
-                content_type=file.content_type or "application/octet-stream",
+                file_content=final_content,
+                file_name=final_filename,
+                content_type=final_content_type,
             )
             
             # Crear registro Archivo (ahora carpeta_id es nullable)
             rfp_file = Archivo(
                 rfp_id=rfp.id,
-                nombre=file.filename,
+                nombre=final_filename,
                 url=file_uri,
-                file_type=file.filename.split(".")[-1].lower(),
+                file_type=final_filename.split(".")[-1].lower(),
                 creado=datetime.utcnow(),
                 habilitado=Constantes.HABILITADO,
                 file_size_bytes=size
@@ -118,9 +153,10 @@ async def upload_rfp(
             db.add(rfp_file)
             
             # Preparar para análisis
+            # USAR PDF CONVERTIDO: Mejor para OCR, Tablas y Paginación (Match visual 1:1)
             files_data_for_analysis.append({
-                "content": content,
-                "filename": file.filename,
+                "content": final_content,
+                "filename": final_filename,
                 "type": rfp_file.file_type
             })
             
@@ -334,6 +370,10 @@ async def get_rfp(
     if not rfp:
         raise HTTPException(status_code=404, detail="RFP no encontrado")
     
+    # Sort files by creation date to ensure 'doc_X' indices (1-based) match the list order
+    # (doc_1 = files[0], doc_2 = files[1], etc.)
+    rfp.files.sort(key=lambda f: f.creado)
+
     return RFPDetail.model_validate(rfp)
 
 
