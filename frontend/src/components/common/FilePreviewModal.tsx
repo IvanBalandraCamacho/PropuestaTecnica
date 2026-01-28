@@ -9,7 +9,7 @@ interface FilePreviewModalProps {
     fileType?: string;
 }
 
-const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ visible, onClose, fileUrl, fileName, fileType }) => {
+const FilePreviewModal: React.FC<FilePreviewModalProps> = ({ visible, onClose, fileUrl, fileName }) => {
 
     if (!visible) return null;
 

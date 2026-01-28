@@ -25,7 +25,6 @@ import {
     DownloadOutlined,
     HomeOutlined,
     ArrowLeftOutlined,
-    CloseCircleOutlined
 } from '@ant-design/icons';
 import { storageService } from '../../services/storageService';
 import type { Carpeta, Archivo } from '../../services/storageService';
